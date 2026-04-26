@@ -1,0 +1,20 @@
+{
+  "name": "ink-trace-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm --filter @ink-trace/core build && pnpm --filter @ink-trace/vue build && pnpm --filter @ink-trace/react build && pnpm --filter ink-trace-playground build",
+    "check": "pnpm -r --if-present check",
+    "dev": "pnpm --filter ink-trace-playground dev",
+    "playground": "pnpm --filter ink-trace-playground dev"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "react": "^19.2.3",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.10",
+    "vue": "^3.5.25"
+  }
+}
