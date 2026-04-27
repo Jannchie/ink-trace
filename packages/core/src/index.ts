@@ -116,10 +116,19 @@ export interface InkTraceOptions {
   backgroundColor?: string | null;
 }
 
+export interface InkTracePlayOptions {
+  duration?: number;
+  from?: number;
+  to?: number;
+  easing?: (t: number) => number;
+  onFinish?: () => void;
+}
+
 export interface InkTraceController {
   render(options?: InkTraceOptions): void;
   update(options: InkTraceOptions): void;
   reseed(seed?: number): void;
+  play(options?: InkTracePlayOptions): void;
   destroy(): void;
 }
 
@@ -354,6 +363,7 @@ function renderPreparedPath(
 
 export class InkTrace implements InkTraceController {
   private options: ResolvedInkTraceOptions;
+  private animationFrame: number | null = null;
 
   constructor(private readonly canvas: HTMLCanvasElement, options: InkTraceOptions = {}) {
     this.options = mergeOptions(DEFAULT_OPTIONS, options);
@@ -372,9 +382,51 @@ export class InkTrace implements InkTraceController {
     this.render({ seed });
   }
 
+  play(options: InkTracePlayOptions = {}): void {
+    this.cancelPlay();
+
+    const duration = Math.max(0, numberOrDefault(options.duration, 1200));
+    const from = clamp(numberOrDefault(options.from, this.options.progress), 0, 1);
+    const to = clamp(numberOrDefault(options.to, 1), 0, 1);
+    const easing = options.easing ?? linearEasing;
+
+    this.render({ progress: from });
+
+    if (duration === 0 || from === to) {
+      this.render({ progress: to });
+      options.onFinish?.();
+      return;
+    }
+
+    const start = performance.now();
+    const tick = (now: number) => {
+      const t = clamp((now - start) / duration, 0, 1);
+      const eased = clamp(numberOrDefault(easing(t), t), 0, 1);
+      this.render({ progress: lerp(from, to, eased) });
+
+      if (t < 1) {
+        this.animationFrame = requestAnimationFrame(tick);
+        return;
+      }
+
+      this.animationFrame = null;
+      this.render({ progress: to });
+      options.onFinish?.();
+    };
+
+    this.animationFrame = requestAnimationFrame(tick);
+  }
+
   destroy(): void {
+    this.cancelPlay();
     const ctx = this.canvas.getContext('2d');
     ctx?.clearRect(0, 0, this.canvas.width, this.canvas.height);
+  }
+
+  private cancelPlay(): void {
+    if (this.animationFrame === null) return;
+    cancelAnimationFrame(this.animationFrame);
+    this.animationFrame = null;
   }
 }
 
@@ -1218,6 +1270,10 @@ function positiveNumberOrDefault(value: number | undefined, fallback: number): n
 
 function lerp(from: number, to: number, t: number): number {
   return from + (to - from) * t;
+}
+
+function linearEasing(t: number): number {
+  return t;
 }
 
 function clamp(value: number, min: number, max: number): number {

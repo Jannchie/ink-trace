@@ -39,7 +39,7 @@ Set `viewBox` when the path data comes from an existing SVG coordinate system.
 | `height` | `number` | `700` | Canvas bitmap height. |
 | `backgroundColor` | `string \| null` | `null` | Optional canvas fill color. Leave `null` for transparent output. |
 
-Animate stroke growth by updating `progress`:
+Animate stroke growth with `play()`:
 
 ```ts
 const trace = createInkTrace(canvas, {
@@ -48,15 +48,11 @@ const trace = createInkTrace(canvas, {
   progress: 0
 });
 
-let start = performance.now();
-function frame(now: number) {
-  const progress = Math.min(1, (now - start) / 1200);
-  trace.update({ progress });
-  if (progress < 1) requestAnimationFrame(frame);
-}
-
-requestAnimationFrame(frame);
+trace.play({ duration: 1200 });
 ```
+
+`play()` defaults to animating from the current `progress` to `1` over `1200ms`.
+It accepts `duration`, `from`, `to`, `easing`, and `onFinish`.
 
 ## Paths
 
@@ -116,4 +112,5 @@ Built-in presets are `fountainPen`, `fineliner`, `brushPen`, `dipPen`, `ballpoin
 | `render(options?)` | Merges options and renders the canvas. |
 | `update(options)` | Alias for rendering with new options. |
 | `reseed(seed?)` | Renders with a provided seed or a random seed. |
+| `play(options?)` | Animates `progress` with optional `duration`, `from`, `to`, `easing`, and `onFinish`. |
 | `destroy()` | Clears the canvas. |

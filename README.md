@@ -116,7 +116,7 @@ Core renderer options:
 | `height` | `number` | `700` | Canvas bitmap height. |
 | `backgroundColor` | `string \| null` | `null` | Optional canvas fill color. Leave `null` for transparent output. |
 
-Animate stroke growth by updating `progress`:
+Animate stroke growth with `play()`:
 
 ```ts
 const trace = createInkTrace(canvas, {
@@ -125,15 +125,11 @@ const trace = createInkTrace(canvas, {
   progress: 0
 });
 
-let start = performance.now();
-function frame(now: number) {
-  const progress = Math.min(1, (now - start) / 1200);
-  trace.update({ progress });
-  if (progress < 1) requestAnimationFrame(frame);
-}
-
-requestAnimationFrame(frame);
+trace.play({ duration: 1200 });
 ```
+
+`play()` defaults to animating from the current `progress` to `1` over `1200ms`.
+It accepts `duration`, `from`, `to`, `easing`, and `onFinish`.
 
 Path item options:
 
