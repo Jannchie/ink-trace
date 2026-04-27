@@ -10,6 +10,7 @@ import tsxLang from 'shiki/langs/tsx.mjs';
 import typescriptLang from 'shiki/langs/typescript.mjs';
 import vueLang from 'shiki/langs/vue.mjs';
 import type {
+  InkTraceEasingName,
   InkTracePathItem,
   InkTracePreset,
   InkTracePresetName
@@ -23,6 +24,7 @@ type FieldMap = Record<string, readonly [PresetGroup, string]>;
 type SnippetTab = 'ts' | 'vue' | 'react';
 type SnippetLanguage = 'typescript' | 'vue' | 'tsx';
 type SnippetMap = Record<SnippetTab, string>;
+type EasingChoice = InkTraceEasingName;
 type PathExampleName =
   | 'bezier'
   | 'line'
@@ -99,6 +101,10 @@ const presetSelect = readElement('preset-select', HTMLSelectElement);
 const pathSelect = readElement('path-select', HTMLSelectElement);
 const backgroundSelect = readElement('background-select', HTMLSelectElement);
 const progressInput = readElement('progress', HTMLInputElement);
+const easingSelect = readElement('easing-select', HTMLSelectElement);
+const strokeDurationInput = readElement('stroke-duration', HTMLInputElement);
+const strokeDelayInput = readElement('stroke-delay', HTMLInputElement);
+const playButton = readElement('play-button', HTMLButtonElement);
 const reseedButton = readElement('reseed-button', HTMLButtonElement);
 const seedReadout = readElement('seed-readout', HTMLElement);
 const snippetTs = readElement('snippet-ts', HTMLElement);
@@ -131,6 +137,8 @@ const trace = createInkTrace(canvas);
 
 syncSettingsToUI();
 updateValue('progress');
+updateValue('stroke-duration');
+updateValue('stroke-delay');
 applyPreviewBackground();
 render();
 
@@ -159,6 +167,9 @@ progressInput.addEventListener('input', () => {
   updateValue('progress');
   render();
 });
+strokeDurationInput.addEventListener('input', () => updateValue('stroke-duration'));
+strokeDelayInput.addEventListener('input', () => updateValue('stroke-delay'));
+playButton.addEventListener('click', playPreview);
 backgroundSelect.addEventListener('change', () => {
   applyPreviewBackground();
   render();
@@ -202,6 +213,29 @@ function render(): void {
     progress
   });
   updateSnippets(preset, paths, progress);
+}
+
+function playPreview(): void {
+  const currentProgress = readProgress();
+  const from = currentProgress >= 1 ? 0 : currentProgress;
+
+  writeProgress(from);
+  render();
+  setPlayState(true);
+
+  trace.play({
+    strokeDuration: readStrokeDuration(),
+    strokeDelay: readStrokeDelay(),
+    from,
+    to: 1,
+    easing: readEasing(),
+    onUpdate: writeProgress,
+    onFinish: () => {
+      writeProgress(1);
+      setPlayState(false);
+      updateSnippets(presetSelect.value as PresetChoice, readSelectedPaths(), 1);
+    }
+  });
 }
 
 function syncSettingsToUI(): void {
@@ -424,6 +458,28 @@ function formatReactAttrs(options: SnippetOptions): string {
 
 function readProgress(): number {
   return Number(progressInput.value);
+}
+
+function readEasing(): EasingChoice {
+  return easingSelect.value as EasingChoice;
+}
+
+function readStrokeDuration(): number {
+  return Number(strokeDurationInput.value);
+}
+
+function readStrokeDelay(): number {
+  return Number(strokeDelayInput.value);
+}
+
+function writeProgress(progress: number): void {
+  progressInput.value = String(Math.min(1, Math.max(0, progress)));
+  updateValue('progress');
+}
+
+function setPlayState(isPlaying: boolean): void {
+  playButton.disabled = isPlaying;
+  playButton.textContent = isPlaying ? 'Playing' : 'Play';
 }
 
 function indent(text: string, levels: number): string {

@@ -48,11 +48,18 @@ const trace = createInkTrace(canvas, {
   progress: 0
 });
 
-trace.play({ duration: 1200 });
+trace.play({
+  strokeDuration: 1200,
+  strokeDelay: 120
+});
 ```
 
-`play()` defaults to animating from the current `progress` to `1` over `1200ms`.
-It accepts `duration`, `from`, `to`, `easing`, and `onFinish`.
+`play()` defaults to `strokeDuration: 1200`, `strokeDelay: 0`, and `easing: "easeInOut"`.
+It accepts `strokeDuration`, `strokeDelay`, `from`, `to`, `easing`, `onUpdate`, and `onFinish`.
+`strokeDuration` is each path item's drawing time.
+`strokeDelay` is the start-time offset between adjacent path items; use `0` for simultaneous strokes or the same value as `strokeDuration` for sequential strokes.
+If `strokeDuration` is not set, `duration` is used as a fallback.
+`easing` defaults to `"easeInOut"` and can be `"linear"`, `"easeIn"`, `"easeOut"`, `"easeInOut"`, or a custom `(t) => number` function.
 
 ## Paths
 
@@ -112,5 +119,5 @@ Built-in presets are `fountainPen`, `fineliner`, `brushPen`, `dipPen`, `ballpoin
 | `render(options?)` | Merges options and renders the canvas. |
 | `update(options)` | Alias for rendering with new options. |
 | `reseed(seed?)` | Renders with a provided seed or a random seed. |
-| `play(options?)` | Animates `progress` with optional `duration`, `from`, `to`, `easing`, and `onFinish`. |
+| `play(options?)` | Animates `progress` with optional `strokeDuration`, `strokeDelay`, `from`, `to`, `easing`, `onUpdate`, and `onFinish`. |
 | `destroy()` | Clears the canvas. |

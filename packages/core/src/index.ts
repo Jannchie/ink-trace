@@ -12,6 +12,7 @@ export type InkTraceTaperProfile = 'uniform' | 'centerHeavy' | 'startHeavy' | 'e
 export type InkTraceTipStyle = 'sharp' | 'blunt' | 'pause' | 'hook';
 export type InkTraceSpeedSimulation = 'none' | 'cornerSlow' | 'straightFast';
 export type InkTraceSplatterShape = 'circle' | 'ellipse' | 'mixed';
+export type InkTraceEasingName = 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
 
 export interface InkTraceNib {
   width: number;
@@ -117,10 +118,13 @@ export interface InkTraceOptions {
 }
 
 export interface InkTracePlayOptions {
+  strokeDuration?: number;
+  strokeDelay?: number;
   duration?: number;
   from?: number;
   to?: number;
-  easing?: (t: number) => number;
+  easing?: InkTraceEasingName | ((t: number) => number);
+  onUpdate?: (progress: number) => void;
   onFinish?: () => void;
 }
 
@@ -160,8 +164,15 @@ interface Corner {
 
 interface PreparedPath {
   item: InkTracePathItem;
+  index: number;
   seed: number;
   length: number;
+  segments: Array<{ points: SampledPoint[]; length: number }>;
+}
+
+interface PathGeometry {
+  pathLength: number;
+  strokeLength: number;
   segments: Array<{ points: SampledPoint[]; length: number }>;
 }
 
@@ -169,6 +180,7 @@ export const INK_TRACE_WIDTH = 1360;
 export const INK_TRACE_HEIGHT = 700;
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
+const PATH_GEOMETRY_CACHE = new Map<string, PathGeometry>();
 
 export const INK_TRACE_PRESETS: Record<InkTracePresetName, InkTracePreset> = {
   fountainPen: {
@@ -298,7 +310,7 @@ export function drawInkPath(
   progress = 1
 ): void {
   const resolved = cloneInkTracePreset(preset);
-  const prepared = preparePath(ctx, path, seed);
+  const prepared = preparePath(ctx, path, seed, 0);
   if (!prepared) return;
 
   const localLength = prepared.length * clamp(progress, 0, 1);
@@ -312,28 +324,73 @@ export function drawInkPath(
   renderPreparedPath(ctx, prepared, resolved, localLength);
 }
 
-function preparePath(ctx: CanvasRenderingContext2D, path: InkTracePathItem, seed: number): PreparedPath | null {
-  const sample = samplePath(path.d, 1, ctx.canvas.ownerDocument);
-  if (!sample || sample.points.length < 2) return null;
+function preparePath(ctx: CanvasRenderingContext2D, path: InkTracePathItem, seed: number, index: number): PreparedPath | null {
+  const geometry = readPathGeometry(ctx, path);
+  if (!geometry) return null;
 
   if (path.fill) {
     return {
       item: path,
+      index,
       seed,
-      length: sample.length,
+      length: geometry.pathLength,
       segments: []
     };
   }
 
-  const segments = splitDashedSegments(sample.points, sample.length, path);
-  const length = segments.reduce((sum, segment) => sum + segment.length, 0);
+  const segments = cloneSegments(geometry.segments);
+  const length = geometry.strokeLength;
   if (length <= 0) return null;
 
   return {
     item: path,
+    index,
     seed,
     length,
     segments
+  };
+}
+
+function readPathGeometry(ctx: CanvasRenderingContext2D, path: InkTracePathItem): PathGeometry | null {
+  const key = createPathGeometryCacheKey(path);
+  const cached = PATH_GEOMETRY_CACHE.get(key);
+  if (cached) return cached;
+
+  const sample = samplePath(path.d, 1, ctx.canvas.ownerDocument);
+  if (!sample || sample.points.length < 2) return null;
+
+  const segments = splitDashedSegments(sample.points, sample.length, path);
+  const geometry = {
+    pathLength: sample.length,
+    strokeLength: segments.reduce((sum, segment) => sum + segment.length, 0),
+    segments: cloneSegments(segments)
+  };
+  PATH_GEOMETRY_CACHE.set(key, geometry);
+  return geometry;
+}
+
+function createPathGeometryCacheKey(path: InkTracePathItem): string {
+  const dashArray = Array.isArray(path.dashArray) ? path.dashArray.join(',') : path.dashArray ?? '';
+  return [path.d, dashArray, path.dashOffset ?? '', path.pathLength ?? ''].join('\u0000');
+}
+
+function cloneSegments(segments: Array<{ points: SampledPoint[]; length: number }>): Array<{ points: SampledPoint[]; length: number }> {
+  return segments.map((segment) => ({
+    length: segment.length,
+    points: segment.points.map(clonePoint)
+  }));
+}
+
+function clonePoint(point: SampledPoint): SampledPoint {
+  return {
+    x: point.x,
+    y: point.y,
+    s: point.s,
+    tx: point.tx,
+    ty: point.ty,
+    nx: point.nx,
+    ny: point.ny,
+    w: point.w
   };
 }
 
@@ -385,24 +442,30 @@ export class InkTrace implements InkTraceController {
   play(options: InkTracePlayOptions = {}): void {
     this.cancelPlay();
 
-    const duration = Math.max(0, numberOrDefault(options.duration, 1200));
+    const strokeDuration = Math.max(0, numberOrDefault(options.strokeDuration, numberOrDefault(options.duration, 1200)));
+    const strokeDelay = Math.max(0, numberOrDefault(options.strokeDelay, 0));
+    const playbackDuration = resolvePlaybackDuration(strokeDuration, strokeDelay, this.options.paths.length);
     const from = clamp(numberOrDefault(options.from, this.options.progress), 0, 1);
     const to = clamp(numberOrDefault(options.to, 1), 0, 1);
-    const easing = options.easing ?? linearEasing;
+    const easing = resolveEasing(options.easing);
 
-    this.render({ progress: from });
+    this.renderPlaybackProgress(from, strokeDuration, strokeDelay, easing);
+    options.onUpdate?.(from);
 
-    if (duration === 0 || from === to) {
-      this.render({ progress: to });
+    if (playbackDuration === 0 || from === to) {
+      this.renderPlaybackProgress(to, strokeDuration, strokeDelay, easing);
+      options.onUpdate?.(to);
       options.onFinish?.();
       return;
     }
 
     const start = performance.now();
+    const duration = playbackDuration * Math.abs(to - from);
     const tick = (now: number) => {
       const t = clamp((now - start) / duration, 0, 1);
-      const eased = clamp(numberOrDefault(easing(t), t), 0, 1);
-      this.render({ progress: lerp(from, to, eased) });
+      const progress = t >= 1 ? to : lerp(from, to, t);
+      this.renderPlaybackProgress(progress, strokeDuration, strokeDelay, easing);
+      options.onUpdate?.(progress);
 
       if (t < 1) {
         this.animationFrame = requestAnimationFrame(tick);
@@ -410,7 +473,6 @@ export class InkTrace implements InkTraceController {
       }
 
       this.animationFrame = null;
-      this.render({ progress: to });
       options.onFinish?.();
     };
 
@@ -427,6 +489,21 @@ export class InkTrace implements InkTraceController {
     if (this.animationFrame === null) return;
     cancelAnimationFrame(this.animationFrame);
     this.animationFrame = null;
+  }
+
+  private renderPlaybackProgress(
+    progress: number,
+    strokeDuration: number,
+    strokeDelay: number,
+    easing: (t: number) => number
+  ): void {
+    const nextProgress = clamp(progress, 0, 1);
+    this.options = mergeOptions(this.options, { progress: nextProgress });
+    renderCanvas(
+      this.canvas,
+      this.options,
+      resolveStrokeProgresses(nextProgress, this.options.paths.length, strokeDuration, strokeDelay, easing)
+    );
   }
 }
 
@@ -446,7 +523,7 @@ function mergeOptions(base: ResolvedInkTraceOptions, options: InkTraceOptions): 
   };
 }
 
-function renderCanvas(canvas: HTMLCanvasElement, options: ResolvedInkTraceOptions): void {
+function renderCanvas(canvas: HTMLCanvasElement, options: ResolvedInkTraceOptions, pathProgresses?: number[]): void {
   if (canvas.width !== options.width) canvas.width = options.width;
   if (canvas.height !== options.height) canvas.height = options.height;
 
@@ -466,14 +543,15 @@ function renderCanvas(canvas: HTMLCanvasElement, options: ResolvedInkTraceOption
 
   const preset = mergeInkTracePreset(options.preset, options.settings);
   const preparedPaths = options.paths
-    .map((path, index) => preparePath(ctx, path, options.seed + index * 7))
+    .map((path, index) => preparePath(ctx, path, options.seed + index * 7, index))
     .filter((path): path is PreparedPath => Boolean(path));
   const totalLength = preparedPaths.reduce((sum, path) => sum + path.length, 0);
   const visibleLength = totalLength * options.progress;
   let offset = 0;
 
   preparedPaths.forEach((path) => {
-    const localLength = clamp(visibleLength - offset, 0, path.length);
+    const pathProgress = pathProgresses ? pathProgresses[path.index] ?? 0 : clamp((visibleLength - offset) / path.length, 0, 1);
+    const localLength = path.length * clamp(pathProgress, 0, 1);
     if (path.item.fill) {
       if (localLength >= path.length) {
         fillPath(ctx, path.item.d, preset.ink);
@@ -1272,8 +1350,38 @@ function lerp(from: number, to: number, t: number): number {
   return from + (to - from) * t;
 }
 
-function linearEasing(t: number): number {
-  return t;
+function resolvePlaybackDuration(strokeDuration: number, strokeDelay: number, strokeCount: number): number {
+  return strokeDuration + strokeDelay * Math.max(0, strokeCount - 1);
+}
+
+function resolveStrokeProgresses(
+  progress: number,
+  strokeCount: number,
+  strokeDuration: number,
+  strokeDelay: number,
+  easing: (t: number) => number
+): number[] {
+  const duration = resolvePlaybackDuration(strokeDuration, strokeDelay, strokeCount);
+  const elapsed = duration * clamp(progress, 0, 1);
+
+  return Array.from({ length: strokeCount }, (_, index) => {
+    const localElapsed = elapsed - strokeDelay * index;
+    const t = strokeDuration === 0 ? (localElapsed >= 0 ? 1 : 0) : clamp(localElapsed / strokeDuration, 0, 1);
+    return clamp(numberOrDefault(easing(t), t), 0, 1);
+  });
+}
+
+const EASINGS: Record<InkTraceEasingName, (t: number) => number> = {
+  linear: (t) => t,
+  easeIn: (t) => t * t * t,
+  easeOut: (t) => 1 - Math.pow(1 - t, 3),
+  easeInOut: (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
+};
+
+function resolveEasing(easing: InkTracePlayOptions['easing']): (t: number) => number {
+  if (typeof easing === 'function') return easing;
+  if (easing) return EASINGS[easing];
+  return EASINGS.easeInOut;
 }
 
 function clamp(value: number, min: number, max: number): number {
