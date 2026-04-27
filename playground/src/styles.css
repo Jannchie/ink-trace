@@ -294,8 +294,7 @@ button {
 }
 
 .usage-code .line {
-  display: block;
-  min-height: 1.6em;
+  display: inline;
 }
 
 @media (max-width: 960px) {

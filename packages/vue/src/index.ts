@@ -34,6 +34,10 @@ export const InkTraceCanvas = defineComponent({
       type: Number,
       default: 1
     },
+    progress: {
+      type: Number,
+      default: 1
+    },
     width: {
       type: Number,
       default: INK_TRACE_WIDTH
@@ -64,6 +68,7 @@ export const InkTraceCanvas = defineComponent({
       paths: props.paths,
       viewBox: props.viewBox ?? null,
       seed: props.seed,
+      progress: props.progress,
       width: props.width,
       height: props.height,
       backgroundColor: props.backgroundColor ?? null
@@ -87,6 +92,7 @@ export const InkTraceCanvas = defineComponent({
         props.paths,
         props.viewBox,
         props.seed,
+        props.progress,
         props.width,
         props.height,
         props.backgroundColor

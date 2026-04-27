@@ -37,6 +37,7 @@ In Nuxt, render it inside `<ClientOnly>` because the simulation uses browser Can
 | `paths` | `InkTracePathItem[]` | `undefined` | SVG path data items to render. |
 | `viewBox` | `string \| InkTraceViewBox \| null` | `undefined` | Source coordinate system, such as `"0 0 1360 700"` or `{ x, y, width, height }`. Use `view-box` in templates. |
 | `seed` | `number` | `1` | Deterministic variation seed. Use the same seed for repeatable output. |
+| `progress` | `number` | `1` | Stroke reveal progress from `0` to `1`. Strokes grow in path order while keeping width, jitter, grain, and splatter stable for the same seed. |
 | `width` | `number` | `1360` | Canvas bitmap width. |
 | `height` | `number` | `700` | Canvas bitmap height. |
 | `backgroundColor` | `string` | `undefined` | Optional canvas fill color. Use `background-color` in templates. |

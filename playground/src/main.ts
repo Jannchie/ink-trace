@@ -98,6 +98,7 @@ const stage = readElement('stage', HTMLElement);
 const presetSelect = readElement('preset-select', HTMLSelectElement);
 const pathSelect = readElement('path-select', HTMLSelectElement);
 const backgroundSelect = readElement('background-select', HTMLSelectElement);
+const progressInput = readElement('progress', HTMLInputElement);
 const reseedButton = readElement('reseed-button', HTMLButtonElement);
 const seedReadout = readElement('seed-readout', HTMLElement);
 const snippetTs = readElement('snippet-ts', HTMLElement);
@@ -129,6 +130,7 @@ let snippetVersion = 0;
 const trace = createInkTrace(canvas);
 
 syncSettingsToUI();
+updateValue('progress');
 applyPreviewBackground();
 render();
 
@@ -153,6 +155,10 @@ presetSelect.addEventListener('change', () => {
 });
 
 pathSelect.addEventListener('change', render);
+progressInput.addEventListener('input', () => {
+  updateValue('progress');
+  render();
+});
 backgroundSelect.addEventListener('change', () => {
   applyPreviewBackground();
   render();
@@ -186,14 +192,16 @@ copyButton.addEventListener('click', () => {
 function render(): void {
   const preset = presetSelect.value as PresetChoice;
   const paths = readSelectedPaths();
+  const progress = readProgress();
 
   seedReadout.textContent = `seed: ${seed}`;
   trace.update({
     preset: settings,
     paths,
-    seed
+    seed,
+    progress
   });
-  updateSnippets(preset, paths);
+  updateSnippets(preset, paths, progress);
 }
 
 function syncSettingsToUI(): void {
@@ -254,8 +262,8 @@ function activateTab(tab: string): void {
   });
 }
 
-function updateSnippets(preset: PresetChoice, paths: InkTracePathItem[]): void {
-  const options = buildOptionsObject(preset, paths);
+function updateSnippets(preset: PresetChoice, paths: InkTracePathItem[], progress: number): void {
+  const options = buildOptionsObject(preset, paths, progress);
   const snippets: SnippetMap = {
     ts: renderTsSnippet(options),
     vue: renderVueSnippet(options),
@@ -311,15 +319,17 @@ interface SnippetOptions {
   settings?: InkTracePreset;
   paths: InkTracePathItem[];
   seed?: number;
+  progress?: number;
 }
 
-function buildOptionsObject(preset: PresetChoice, paths: InkTracePathItem[]): SnippetOptions {
+function buildOptionsObject(preset: PresetChoice, paths: InkTracePathItem[], progress: number): SnippetOptions {
   const options: SnippetOptions = { paths };
 
   if (preset === 'custom') options.settings = settings;
   else if (preset !== 'fountainPen') options.preset = preset;
 
   if (seed !== 1) options.seed = seed;
+  if (progress !== 1) options.progress = progress;
   return options;
 }
 
@@ -327,7 +337,6 @@ function renderTsSnippet(options: SnippetOptions): string {
   const body = formatTsObject(options, 0);
   return [
     `import { createInkTrace } from '@ink-trace/core';`,
-    ``,
     `const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;`,
     body === '{}'
       ? `createInkTrace(canvas).render();`
@@ -338,18 +347,14 @@ function renderTsSnippet(options: SnippetOptions): string {
 function renderVueSnippet(options: SnippetOptions): string {
   const attrs = formatVueAttrs(options);
   const tag = attrs ? `<InkTraceCanvas\n${attrs}\n/>` : `<InkTraceCanvas />`;
-  const setup = [
-    ``,
-    `const paths = ${formatTsObject(options.paths, 0)};`,
-    ...(options.settings ? [``, `const settings = ${formatTsObject(options.settings, 0)};`] : [])
-  ];
+  const setup = [`const paths = ${formatTsObject(options.paths, 0)};`];
+  if (options.settings) setup.push(`const settings = ${formatTsObject(options.settings, 0)};`);
 
   return [
     `<script setup lang="ts">`,
     `import { InkTraceCanvas } from '@ink-trace/vue';`,
-    ...setup,
+    setup.join('\n'),
     `</script>`,
-    ``,
     `<template>`,
     indent(tag, 1),
     `</template>`
@@ -358,17 +363,13 @@ function renderVueSnippet(options: SnippetOptions): string {
 
 function renderReactSnippet(options: SnippetOptions): string {
   const attrs = formatReactAttrs(options);
-  const constants = [
-    ``,
-    `const paths = ${formatTsObject(options.paths, 0)};`,
-    ...(options.settings ? [``, `const settings = ${formatTsObject(options.settings, 0)};`] : [])
-  ];
+  const constants = [`const paths = ${formatTsObject(options.paths, 0)};`];
+  if (options.settings) constants.push(`const settings = ${formatTsObject(options.settings, 0)};`);
   const tag = attrs ? `<InkTraceCanvas\n${attrs}\n    />` : `<InkTraceCanvas />`;
 
   return [
     `import { InkTraceCanvas } from '@ink-trace/react';`,
-    ...constants,
-    ``,
+    constants.join('\n'),
     `export function App() {`,
     `  return (`,
     `    ${tag}`,
@@ -406,6 +407,7 @@ function formatVueAttrs(options: SnippetOptions): string {
   lines.push(`  :paths="paths"`);
   if (options.settings) lines.push(`  :settings="settings"`);
   if (options.seed !== undefined) lines.push(`  :seed="${options.seed}"`);
+  if (options.progress !== undefined) lines.push(`  :progress="${options.progress}"`);
   return lines.join('\n');
 }
 
@@ -416,7 +418,12 @@ function formatReactAttrs(options: SnippetOptions): string {
   lines.push(`${pad}paths={paths}`);
   if (options.settings) lines.push(`${pad}settings={settings}`);
   if (options.seed !== undefined) lines.push(`${pad}seed={${options.seed}}`);
+  if (options.progress !== undefined) lines.push(`${pad}progress={${options.progress}}`);
   return lines.join('\n');
+}
+
+function readProgress(): number {
+  return Number(progressInput.value);
 }
 
 function indent(text: string, levels: number): string {

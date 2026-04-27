@@ -37,6 +37,7 @@ The component renders a transparent `<canvas>` by default.
 | `paths` | `InkTracePathItem[]` | `undefined` | SVG path data items to render. |
 | `viewBox` | `string \| InkTraceViewBox \| null` | `null` | Source coordinate system, such as `"0 0 1360 700"` or `{ x, y, width, height }`. |
 | `seed` | `number` | `1` | Deterministic variation seed. Use the same seed for repeatable output. |
+| `progress` | `number` | `1` | Stroke reveal progress from `0` to `1`. Strokes grow in path order while keeping width, jitter, grain, and splatter stable for the same seed. |
 | `width` | `number` | `1360` | Canvas bitmap width. |
 | `height` | `number` | `700` | Canvas bitmap height. |
 | `backgroundColor` | `string \| null` | `null` | Optional canvas fill color. Leave `null` for transparent output. |

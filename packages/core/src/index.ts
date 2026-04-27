@@ -110,6 +110,7 @@ export interface InkTraceOptions {
   paths?: InkTracePathItem[];
   viewBox?: string | InkTraceViewBox | null;
   seed?: number;
+  progress?: number;
   width?: number;
   height?: number;
   backgroundColor?: string | null;
@@ -127,6 +128,7 @@ interface ResolvedInkTraceOptions extends Required<Pick<InkTraceOptions, 'seed' 
   settings?: InkTracePresetPatch;
   paths: InkTracePathItem[];
   viewBox: string | InkTraceViewBox | null;
+  progress: number;
   backgroundColor: string | null;
 }
 
@@ -139,11 +141,19 @@ interface SampledPoint {
   nx: number;
   ny: number;
   w: number;
+  revealHead?: boolean;
 }
 
 interface Corner {
   idx: number;
   strength: number;
+}
+
+interface PreparedPath {
+  item: InkTracePathItem;
+  seed: number;
+  length: number;
+  segments: Array<{ points: SampledPoint[]; length: number }>;
 }
 
 export const INK_TRACE_WIDTH = 1360;
@@ -233,6 +243,7 @@ const DEFAULT_OPTIONS: ResolvedInkTraceOptions = {
   width: INK_TRACE_WIDTH,
   height: INK_TRACE_HEIGHT,
   viewBox: null,
+  progress: 1,
   backgroundColor: null
 };
 
@@ -274,15 +285,71 @@ export function drawInkPath(
   ctx: CanvasRenderingContext2D,
   path: InkTracePathItem,
   preset: InkTracePresetName | InkTracePreset,
-  seed = 1
+  seed = 1,
+  progress = 1
 ): void {
   const resolved = cloneInkTracePreset(preset);
+  const prepared = preparePath(ctx, path, seed);
+  if (!prepared) return;
+
+  const localLength = prepared.length * clamp(progress, 0, 1);
   if (path.fill) {
-    fillPath(ctx, path.d, resolved.ink);
+    if (localLength >= prepared.length) {
+      fillPath(ctx, path.d, resolved.ink);
+    }
     return;
   }
 
-  renderInkPath(ctx, path.d, resolved, seed, path);
+  renderPreparedPath(ctx, prepared, resolved, localLength);
+}
+
+function preparePath(ctx: CanvasRenderingContext2D, path: InkTracePathItem, seed: number): PreparedPath | null {
+  const sample = samplePath(path.d, 1, ctx.canvas.ownerDocument);
+  if (!sample || sample.points.length < 2) return null;
+
+  if (path.fill) {
+    return {
+      item: path,
+      seed,
+      length: sample.length,
+      segments: []
+    };
+  }
+
+  const segments = splitDashedSegments(sample.points, sample.length, path);
+  const length = segments.reduce((sum, segment) => sum + segment.length, 0);
+  if (length <= 0) return null;
+
+  return {
+    item: path,
+    seed,
+    length,
+    segments
+  };
+}
+
+function renderPreparedPath(
+  ctx: CanvasRenderingContext2D,
+  prepared: PreparedPath,
+  preset: InkTracePreset,
+  visibleLength: number
+): void {
+  let offset = 0;
+  prepared.segments.forEach((segment, index) => {
+    const segmentProgress = clamp((visibleLength - offset) / segment.length, 0, 1);
+    if (segmentProgress > 0) {
+      renderSampledInkPath(
+        ctx,
+        segment.points,
+        segment.length,
+        preset,
+        prepared.seed + index * 13,
+        Boolean(prepared.item.closed && prepared.segments.length === 1),
+        segmentProgress
+      );
+    }
+    offset += segment.length;
+  });
 }
 
 export class InkTrace implements InkTraceController {
@@ -320,6 +387,7 @@ function mergeOptions(base: ResolvedInkTraceOptions, options: InkTraceOptions): 
     paths: options.paths ?? base.paths,
     viewBox: options.viewBox === undefined ? base.viewBox : options.viewBox,
     seed: numberOrDefault(options.seed, base.seed),
+    progress: clamp(numberOrDefault(options.progress, base.progress), 0, 1),
     width: positiveNumberOrDefault(options.width, base.width),
     height: positiveNumberOrDefault(options.height, base.height),
     backgroundColor: options.backgroundColor === undefined ? base.backgroundColor : options.backgroundColor
@@ -345,31 +413,26 @@ function renderCanvas(canvas: HTMLCanvasElement, options: ResolvedInkTraceOption
   ctx.translate(-viewBox.x, -viewBox.y);
 
   const preset = mergeInkTracePreset(options.preset, options.settings);
-  options.paths.forEach((path, index) => {
-    if (path.fill) {
-      fillPath(ctx, path.d, preset.ink);
+  const preparedPaths = options.paths
+    .map((path, index) => preparePath(ctx, path, options.seed + index * 7))
+    .filter((path): path is PreparedPath => Boolean(path));
+  const totalLength = preparedPaths.reduce((sum, path) => sum + path.length, 0);
+  const visibleLength = totalLength * options.progress;
+  let offset = 0;
+
+  preparedPaths.forEach((path) => {
+    const localLength = clamp(visibleLength - offset, 0, path.length);
+    if (path.item.fill) {
+      if (localLength >= path.length) {
+        fillPath(ctx, path.item.d, preset.ink);
+      }
     } else {
-      renderInkPath(ctx, path.d, preset, options.seed + index * 7, path);
+      renderPreparedPath(ctx, path, preset, localLength);
     }
+    offset += path.length;
   });
 
   ctx.restore();
-}
-
-function renderInkPath(
-  ctx: CanvasRenderingContext2D,
-  d: string,
-  preset: InkTracePreset,
-  seed: number,
-  item: Pick<InkTracePathItem, 'closed' | 'dashArray' | 'dashOffset' | 'pathLength'>
-): void {
-  const sample = samplePath(d, 1, ctx.canvas.ownerDocument);
-  if (!sample || sample.points.length < 2) return;
-
-  const segments = splitDashedSegments(sample.points, sample.length, item);
-  segments.forEach((segment, index) => {
-    renderSampledInkPath(ctx, segment.points, segment.length, preset, seed + index * 13, item.closed && segments.length === 1);
-  });
 }
 
 function renderSampledInkPath(
@@ -378,7 +441,8 @@ function renderSampledInkPath(
   len: number,
   preset: InkTracePreset,
   seed: number,
-  closed = false
+  closed = false,
+  progress = 1
 ): void {
   const { jitter, flow, ink } = preset;
   const inkA = ink.alpha ?? 1;
@@ -390,9 +454,14 @@ function renderSampledInkPath(
   const corners = findCorners(points);
   const flowArr = resolveFlow(points, flow, corners, seed);
   resolveWidths(points, len, preset, flowArr, seed, closed);
-  drawFlowingStroke(ctx, points, flowArr, preset, seed);
-  drawSplitNib(ctx, points, flowArr, preset, inkA);
-  drawSplatter(ctx, points, len, corners, flowArr, preset, seed);
+
+  const visibleLength = len * clamp(progress, 0, 1);
+  const visible = sliceResolvedPoints(points, flowArr, visibleLength);
+  if (visible.points.length >= 2) {
+    drawFlowingStroke(ctx, visible.points, visible.flowArr, preset, seed);
+    drawSplitNib(ctx, visible.points, visible.flowArr, preset, inkA);
+  }
+  drawSplatter(ctx, points, len, corners, flowArr, preset, seed, visibleLength);
 }
 
 function splitDashedSegments(
@@ -457,6 +526,55 @@ function slicePoints(points: SampledPoint[], start: number, end: number): Sample
     ...point,
     s: point.s - start
   }));
+}
+
+function sliceResolvedPoints(
+  points: SampledPoint[],
+  flowArr: number[],
+  visibleLength: number
+): { points: SampledPoint[]; flowArr: number[] } {
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (!first || !last || visibleLength <= 0) return { points: [], flowArr: [] };
+  if (visibleLength >= last.s) return { points, flowArr };
+
+  const endIndex = points.findIndex((point) => point.s >= visibleLength);
+  if (endIndex <= 0) return { points: [first], flowArr: [flowArr[0] ?? 1] };
+
+  const visiblePoints = points.slice(0, endIndex);
+  const visibleFlow = flowArr.slice(0, endIndex);
+  const previous = points[endIndex - 1];
+  const next = points[endIndex];
+  if (!previous || !next) return { points: visiblePoints, flowArr: visibleFlow };
+
+  if (visibleLength > previous.s) {
+    const span = next.s - previous.s || 1;
+    const t = (visibleLength - previous.s) / span;
+    visiblePoints.push(interpolateResolvedPoint(previous, next, t, visibleLength));
+    visibleFlow.push(lerp(flowArr[endIndex - 1] ?? 1, flowArr[endIndex] ?? 1, t));
+  }
+
+  return { points: visiblePoints, flowArr: visibleFlow };
+}
+
+function interpolateResolvedPoint(previous: SampledPoint, next: SampledPoint, t: number, s: number): SampledPoint {
+  const tx = lerp(previous.tx, next.tx, t);
+  const ty = lerp(previous.ty, next.ty, t);
+  const tl = Math.hypot(tx, ty) || 1;
+  const ntx = tx / tl;
+  const nty = ty / tl;
+
+  return {
+    x: lerp(previous.x, next.x, t),
+    y: lerp(previous.y, next.y, t),
+    s,
+    tx: ntx,
+    ty: nty,
+    nx: -nty,
+    ny: ntx,
+    w: lerp(previous.w, next.w, t),
+    revealHead: true
+  };
 }
 
 function interpolatePointAtDistance(points: SampledPoint[], distance: number): SampledPoint {
@@ -713,6 +831,8 @@ function drawDryGrain(
     if (hash(k, seed + 301) > grainProbability) continue;
 
     const point = points[k];
+    if (point.revealHead) continue;
+
     const length = point.w * (0.4 + hash(k, seed + 302) * 1.2) * drypen.grainLength;
     const thickness = point.w * (0.3 + localFlow * 0.5);
     const offset = (hash(k, seed + 303) - 0.5) * point.w * 0.6;
@@ -781,7 +901,8 @@ function drawSplatter(
   corners: Corner[],
   flowArr: number[],
   preset: InkTracePreset,
-  seed: number
+  seed: number,
+  visibleLength = length
 ): void {
   const { nib, splatter, ink } = preset;
   if (splatter.intensity <= 0) return;
@@ -805,6 +926,7 @@ function drawSplatter(
     }
 
     if (pathS < startS || pathS > endS) continue;
+    if (pathS > visibleLength) continue;
 
     const pointIndex = Math.round(pathS / length * (points.length - 1));
     const localFlow = flowArr[pointIndex];
@@ -826,9 +948,11 @@ function drawSplatter(
   corners.forEach((corner) => {
     if (corner.idx < 5 || corner.idx > points.length - 5) return;
 
+    const point = points[corner.idx];
+    if (!point || point.s > visibleLength) return;
+
     const cornerCount = Math.floor((1 + hash(corner.idx, seed + 91) * 3) * splatter.density * splatter.cornerBoost);
     for (let k = 0; k < cornerCount; k++) {
-      const point = points[corner.idx];
       const offsetDistance = nib.width * splatter.spread * (0.4 + hash(k, seed + 92 + corner.idx) * 0.8);
       const angle = hash(k, seed + 93 + corner.idx) * Math.PI * 2;
       const radius = nib.width * (0.15 + hash(k, seed + 94 + corner.idx) * (0.3 + splatter.sizeVariance * 0.5));
@@ -1090,6 +1214,10 @@ function numberOrDefault(value: number | undefined, fallback: number): number {
 function positiveNumberOrDefault(value: number | undefined, fallback: number): number {
   const nextValue = numberOrDefault(value, fallback);
   return nextValue > 0 ? nextValue : fallback;
+}
+
+function lerp(from: number, to: number, t: number): number {
+  return from + (to - from) * t;
 }
 
 function clamp(value: number, min: number, max: number): number {

@@ -20,6 +20,7 @@ export function InkTraceCanvas({
   paths,
   viewBox = null,
   seed = 1,
+  progress = 1,
   width = INK_TRACE_WIDTH,
   height = INK_TRACE_HEIGHT,
   backgroundColor = null,
@@ -49,11 +50,12 @@ export function InkTraceCanvas({
       paths,
       viewBox,
       seed,
+      progress,
       width,
       height,
       backgroundColor
     });
-  }, [backgroundColor, height, paths, preset, seed, settings, viewBox, width]);
+  }, [backgroundColor, height, paths, preset, progress, seed, settings, viewBox, width]);
 
   return (
     <canvas

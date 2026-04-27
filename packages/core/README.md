@@ -34,9 +34,29 @@ Set `viewBox` when the path data comes from an existing SVG coordinate system.
 | `paths` | `InkTracePathItem[]` | `[]` | SVG path data items to render. |
 | `viewBox` | `string \| InkTraceViewBox \| null` | `null` | Source coordinate system, such as `"0 0 1360 700"` or `{ x, y, width, height }`. |
 | `seed` | `number` | `1` | Deterministic variation seed. Use the same seed for repeatable output. |
+| `progress` | `number` | `1` | Stroke reveal progress from `0` to `1`. Strokes grow in path order while keeping width, jitter, grain, and splatter stable for the same seed. |
 | `width` | `number` | `1360` | Canvas bitmap width. |
 | `height` | `number` | `700` | Canvas bitmap height. |
 | `backgroundColor` | `string \| null` | `null` | Optional canvas fill color. Leave `null` for transparent output. |
+
+Animate stroke growth by updating `progress`:
+
+```ts
+const trace = createInkTrace(canvas, {
+  preset: "brushPen",
+  paths,
+  progress: 0
+});
+
+let start = performance.now();
+function frame(now: number) {
+  const progress = Math.min(1, (now - start) / 1200);
+  trace.update({ progress });
+  if (progress < 1) requestAnimationFrame(frame);
+}
+
+requestAnimationFrame(frame);
+```
 
 ## Paths
 
