@@ -1,0 +1,55 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+
+      - name: Upgrade npm
+        run: npm install -g npm@^11.10.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check
+        run: pnpm check
+
+      - name: Build
+        run: pnpm build
+
+      - name: Pack packages
+        run: |
+          mkdir -p .release
+          pnpm --filter @ink-trace/core pack --pack-destination .release
+          pnpm --filter @ink-trace/react pack --pack-destination .release
+          pnpm --filter @ink-trace/vue pack --pack-destination .release
+
+      - name: Publish packages
+        run: |
+          npm publish .release/ink-trace-core-*.tgz --access public
+          npm publish .release/ink-trace-react-*.tgz --access public
+          npm publish .release/ink-trace-vue-*.tgz --access public

@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jannchie/ink-trace.git"
+  },
   "scripts": {
     "build": "pnpm --filter @ink-trace/core build && pnpm --filter @ink-trace/vue build && pnpm --filter @ink-trace/react build && pnpm --filter ink-trace-playground build",
     "check": "pnpm -r --if-present check",

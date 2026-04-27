@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "description": "React component for canvas ink stroke simulation.",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jannchie/ink-trace.git",
+    "directory": "packages/react"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
