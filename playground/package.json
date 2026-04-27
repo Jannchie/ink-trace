@@ -9,7 +9,9 @@
     "dev": "vite --host 0.0.0.0"
   },
   "dependencies": {
-    "@ink-trace/core": "workspace:*"
+    "@ink-trace/core": "workspace:*",
+    "@jannchie/shiki-theme": "^2.0.0",
+    "shiki": "^4.0.2"
   },
   "devDependencies": {
     "typescript": "^6.0.3",

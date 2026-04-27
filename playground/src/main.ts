@@ -3,16 +3,58 @@ import {
   cloneInkTracePreset,
   INK_TRACE_PRESETS
 } from '@ink-trace/core';
+import { jannchieLight } from '@jannchie/shiki-theme';
+import { createHighlighterCore } from 'shiki/core';
+import { createJavaScriptRegexEngine } from 'shiki/engine/javascript';
+import tsxLang from 'shiki/langs/tsx.mjs';
+import typescriptLang from 'shiki/langs/typescript.mjs';
+import vueLang from 'shiki/langs/vue.mjs';
 import type {
+  InkTracePathItem,
   InkTracePreset,
-  InkTracePresetName,
-  InkTraceShapeName
+  InkTracePresetName
 } from '@ink-trace/core';
+import type { ThemeRegistrationAny } from 'shiki/core';
 import './styles.css';
 
 type PresetChoice = InkTracePresetName | 'custom';
 type PresetGroup = keyof InkTracePreset;
 type FieldMap = Record<string, readonly [PresetGroup, string]>;
+type SnippetTab = 'ts' | 'vue' | 'react';
+type SnippetLanguage = 'typescript' | 'vue' | 'tsx';
+type SnippetMap = Record<SnippetTab, string>;
+type PathExampleName =
+  | 'bezier'
+  | 'line'
+  | 'rect'
+  | 'circle'
+  | 'triangle'
+  | 'arrow'
+  | 'flowchart'
+  | 'signature';
+
+const PLAYGROUND_PATH_EXAMPLES: Record<PathExampleName, InkTracePathItem[]> = {
+  line: [{ d: 'M 200 350 L 1160 350', closed: false }],
+  bezier: [{ d: 'M 200 550 C 400 150, 800 150, 1160 550', closed: false }],
+  rect: [{ d: 'M 400 200 L 960 200 L 960 500 L 400 500 Z', closed: true }],
+  circle: [{ d: 'M 480 350 A 200 200 0 1 0 880 350 A 200 200 0 1 0 480 350', closed: true }],
+  triangle: [{ d: 'M 680 150 L 1000 530 L 360 530 Z', closed: true }],
+  arrow: [
+    { d: 'M 200 350 L 1080 350', closed: false },
+    { d: 'M 1080 350 L 1015 312', closed: false },
+    { d: 'M 1080 350 L 1015 388', closed: false }
+  ],
+  flowchart: [
+    { d: 'M 180 270 L 480 270 L 480 430 L 180 430 Z', closed: true },
+    { d: 'M 880 270 L 1180 270 L 1180 430 L 880 430 Z', closed: true },
+    { d: 'M 480 350 C 600 350, 760 350, 870 350', closed: false },
+    { d: 'M 870 350 L 820 325', closed: false },
+    { d: 'M 870 350 L 820 375', closed: false }
+  ],
+  signature: [
+    { d: 'M 200 400 C 280 320, 320 480, 400 380 C 460 320, 480 460, 560 360 C 640 280, 700 480, 800 380 C 880 300, 920 460, 1000 360', closed: false }
+  ]
+};
 
 const FIELD_MAP = {
   'nib-width': ['nib', 'width'],
@@ -54,7 +96,7 @@ const FIELD_IDS = Object.keys(FIELD_MAP) as Array<keyof typeof FIELD_MAP>;
 const canvas = readElement('ink-canvas', HTMLCanvasElement);
 const stage = readElement('stage', HTMLElement);
 const presetSelect = readElement('preset-select', HTMLSelectElement);
-const shapeSelect = readElement('shape-select', HTMLSelectElement);
+const pathSelect = readElement('path-select', HTMLSelectElement);
 const backgroundSelect = readElement('background-select', HTMLSelectElement);
 const reseedButton = readElement('reseed-button', HTMLButtonElement);
 const seedReadout = readElement('seed-readout', HTMLElement);
@@ -64,9 +106,26 @@ const snippetReact = readElement('snippet-react', HTMLElement);
 const copyButton = readElement('copy-button', HTMLButtonElement);
 const tabButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('.usage-tabs button[role="tab"]'));
 const codeBlocks = Array.from(document.querySelectorAll<HTMLElement>('.usage-code'));
+const snippetTargets: Record<SnippetTab, HTMLElement> = {
+  ts: snippetTs,
+  vue: snippetVue,
+  react: snippetReact
+};
+const snippetLanguages = {
+  ts: 'typescript',
+  vue: 'vue',
+  react: 'tsx'
+} as const satisfies Record<SnippetTab, SnippetLanguage>;
+const codeTheme = jannchieLight as ThemeRegistrationAny;
+const highlighterPromise = createHighlighterCore({
+  themes: [codeTheme],
+  langs: [typescriptLang, vueLang, tsxLang],
+  engine: createJavaScriptRegexEngine()
+});
 
 let seed = 1;
 let settings = cloneInkTracePreset('fountainPen');
+let snippetVersion = 0;
 const trace = createInkTrace(canvas);
 
 syncSettingsToUI();
@@ -93,7 +152,7 @@ presetSelect.addEventListener('change', () => {
   render();
 });
 
-shapeSelect.addEventListener('change', render);
+pathSelect.addEventListener('change', render);
 backgroundSelect.addEventListener('change', () => {
   applyPreviewBackground();
   render();
@@ -126,16 +185,15 @@ copyButton.addEventListener('click', () => {
 
 function render(): void {
   const preset = presetSelect.value as PresetChoice;
-  const shape = shapeSelect.value as InkTraceShapeName;
+  const paths = readSelectedPaths();
 
   seedReadout.textContent = `seed: ${seed}`;
   trace.update({
     preset: settings,
-    shape,
-    seed,
-    drawLabels: shape === 'all'
+    paths,
+    seed
   });
-  updateSnippets(preset, shape);
+  updateSnippets(preset, paths);
 }
 
 function syncSettingsToUI(): void {
@@ -180,6 +238,12 @@ function applyPreviewBackground(): void {
   stage.style.backgroundColor = backgroundSelect.value;
 }
 
+function readSelectedPaths(): InkTracePathItem[] {
+  const selected = pathSelect.value as PathExampleName;
+  const paths = PLAYGROUND_PATH_EXAMPLES[selected] ?? PLAYGROUND_PATH_EXAMPLES.rect;
+  return paths.map((path) => ({ ...path }));
+}
+
 function activateTab(tab: string): void {
   tabButtons.forEach((button) => {
     if (button.id === 'copy-button') return;
@@ -190,27 +254,71 @@ function activateTab(tab: string): void {
   });
 }
 
-function updateSnippets(preset: PresetChoice, shape: InkTraceShapeName): void {
-  const options = buildOptionsObject(preset, shape);
-  snippetTs.textContent = renderTsSnippet(options);
-  snippetVue.textContent = renderVueSnippet(options);
-  snippetReact.textContent = renderReactSnippet(options);
+function updateSnippets(preset: PresetChoice, paths: InkTracePathItem[]): void {
+  const options = buildOptionsObject(preset, paths);
+  const snippets: SnippetMap = {
+    ts: renderTsSnippet(options),
+    vue: renderVueSnippet(options),
+    react: renderReactSnippet(options)
+  };
+  const version = ++snippetVersion;
+
+  Object.entries(snippets).forEach(([tab, code]) => {
+    snippetTargets[tab as SnippetTab].textContent = code;
+  });
+
+  void highlightSnippets(snippets, version);
+}
+
+async function highlightSnippets(snippets: SnippetMap, version: number): Promise<void> {
+  try {
+    const highlighter = await highlighterPromise;
+    if (version !== snippetVersion) return;
+
+    (Object.keys(snippets) as SnippetTab[]).forEach((tab) => {
+      const html = highlighter.codeToHtml(snippets[tab], {
+        lang: snippetLanguages[tab],
+        theme: codeTheme
+      });
+      snippetTargets[tab].innerHTML = extractCodeHtml(html, snippets[tab]);
+    });
+  } catch (error) {
+    console.error('Failed to highlight snippets', error);
+  }
+}
+
+function extractCodeHtml(html: string, fallback: string): string {
+  const template = document.createElement('template');
+  template.innerHTML = html.trim();
+  return template.content.querySelector('code')?.innerHTML ?? escapeHtml(fallback);
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (char) => {
+    const entities: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    };
+    return entities[char] ?? char;
+  });
 }
 
 interface SnippetOptions {
   preset?: InkTracePresetName;
   settings?: InkTracePreset;
-  shape?: InkTraceShapeName;
+  paths: InkTracePathItem[];
   seed?: number;
 }
 
-function buildOptionsObject(preset: PresetChoice, shape: InkTraceShapeName): SnippetOptions {
-  const options: SnippetOptions = {};
+function buildOptionsObject(preset: PresetChoice, paths: InkTracePathItem[]): SnippetOptions {
+  const options: SnippetOptions = { paths };
 
   if (preset === 'custom') options.settings = settings;
   else if (preset !== 'fountainPen') options.preset = preset;
 
-  if (shape !== 'rect') options.shape = shape;
   if (seed !== 1) options.seed = seed;
   return options;
 }
@@ -230,9 +338,11 @@ function renderTsSnippet(options: SnippetOptions): string {
 function renderVueSnippet(options: SnippetOptions): string {
   const attrs = formatVueAttrs(options);
   const tag = attrs ? `<InkTraceCanvas\n${attrs}\n/>` : `<InkTraceCanvas />`;
-  const setup = options.settings
-    ? [``, `const settings = ${formatTsObject(options.settings, 0)};`]
-    : [];
+  const setup = [
+    ``,
+    `const paths = ${formatTsObject(options.paths, 0)};`,
+    ...(options.settings ? [``, `const settings = ${formatTsObject(options.settings, 0)};`] : [])
+  ];
 
   return [
     `<script setup lang="ts">`,
@@ -248,14 +358,16 @@ function renderVueSnippet(options: SnippetOptions): string {
 
 function renderReactSnippet(options: SnippetOptions): string {
   const attrs = formatReactAttrs(options);
-  const settings = options.settings
-    ? [``, `const settings = ${formatTsObject(options.settings, 0)};`]
-    : [];
+  const constants = [
+    ``,
+    `const paths = ${formatTsObject(options.paths, 0)};`,
+    ...(options.settings ? [``, `const settings = ${formatTsObject(options.settings, 0)};`] : [])
+  ];
   const tag = attrs ? `<InkTraceCanvas\n${attrs}\n    />` : `<InkTraceCanvas />`;
 
   return [
     `import { InkTraceCanvas } from '@ink-trace/react';`,
-    ...settings,
+    ...constants,
     ``,
     `export function App() {`,
     `  return (`,
@@ -270,6 +382,14 @@ function formatTsObject(value: unknown, depth: number): string {
   if (typeof value === 'string') return JSON.stringify(value);
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
   if (typeof value !== 'object') return String(value);
+  if (Array.isArray(value)) {
+    if (value.length === 0) return '[]';
+
+    const pad = '  '.repeat(depth + 1);
+    const closePad = '  '.repeat(depth);
+    const lines = value.map((item) => `${pad}${formatTsObject(item, depth + 1)}`);
+    return `[\n${lines.join(',\n')}\n${closePad}]`;
+  }
 
   const entries = Object.entries(value as Record<string, unknown>);
   if (entries.length === 0) return '{}';
@@ -283,8 +403,8 @@ function formatTsObject(value: unknown, depth: number): string {
 function formatVueAttrs(options: SnippetOptions): string {
   const lines: string[] = [];
   if (options.preset) lines.push(`  preset=${JSON.stringify(options.preset)}`);
+  lines.push(`  :paths="paths"`);
   if (options.settings) lines.push(`  :settings="settings"`);
-  if (options.shape) lines.push(`  shape=${JSON.stringify(options.shape)}`);
   if (options.seed !== undefined) lines.push(`  :seed="${options.seed}"`);
   return lines.join('\n');
 }
@@ -293,8 +413,8 @@ function formatReactAttrs(options: SnippetOptions): string {
   const pad = '      ';
   const lines: string[] = [];
   if (options.preset) lines.push(`${pad}preset=${JSON.stringify(options.preset)}`);
+  lines.push(`${pad}paths={paths}`);
   if (options.settings) lines.push(`${pad}settings={settings}`);
-  if (options.shape) lines.push(`${pad}shape=${JSON.stringify(options.shape)}`);
   if (options.seed !== undefined) lines.push(`${pad}seed={${options.seed}}`);
   return lines.join('\n');
 }

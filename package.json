@@ -7,7 +7,8 @@
     "build": "pnpm --filter @ink-trace/core build && pnpm --filter @ink-trace/vue build && pnpm --filter @ink-trace/react build && pnpm --filter ink-trace-playground build",
     "check": "pnpm -r --if-present check",
     "dev": "pnpm --filter ink-trace-playground dev",
-    "playground": "pnpm --filter ink-trace-playground dev"
+    "playground": "pnpm --filter ink-trace-playground dev",
+    "release": "pnpm check && pnpm build && pnpm -r publish --access public"
   },
   "devDependencies": {
     "@types/react": "^19.2.14",

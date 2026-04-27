@@ -8,7 +8,7 @@ import type {
   InkTracePreset,
   InkTracePresetName,
   InkTracePresetPatch,
-  InkTraceShapeName
+  InkTraceViewBox
 } from '@ink-trace/core';
 
 export const InkTraceCanvas = defineComponent({
@@ -22,12 +22,12 @@ export const InkTraceCanvas = defineComponent({
       type: Object as PropType<InkTracePresetPatch>,
       default: undefined
     },
-    shape: {
-      type: String as PropType<InkTraceShapeName>,
-      default: 'rect'
-    },
     paths: {
       type: Array as PropType<InkTracePathItem[]>,
+      default: undefined
+    },
+    viewBox: {
+      type: [String, Object] as PropType<string | InkTraceViewBox | null>,
       default: undefined
     },
     seed: {
@@ -46,10 +46,6 @@ export const InkTraceCanvas = defineComponent({
       type: String,
       default: undefined
     },
-    drawLabels: {
-      type: Boolean,
-      default: true
-    },
     ariaLabel: {
       type: String,
       default: undefined
@@ -65,13 +61,12 @@ export const InkTraceCanvas = defineComponent({
     const readOptions = (): InkTraceOptions => ({
       preset: props.preset,
       settings: props.settings,
-      shape: props.shape,
       paths: props.paths,
+      viewBox: props.viewBox ?? null,
       seed: props.seed,
       width: props.width,
       height: props.height,
-      backgroundColor: props.backgroundColor ?? null,
-      drawLabels: props.drawLabels
+      backgroundColor: props.backgroundColor ?? null
     });
 
     const render = () => {
@@ -89,13 +84,12 @@ export const InkTraceCanvas = defineComponent({
       () => [
         props.preset,
         props.settings,
-        props.shape,
         props.paths,
+        props.viewBox,
         props.seed,
         props.width,
         props.height,
-        props.backgroundColor,
-        props.drawLabels
+        props.backgroundColor
       ],
       render,
       { deep: true }

@@ -8,7 +8,7 @@
   --text-muted: #64748b;
   --accent: #2563eb;
   --accent-soft: #dbeafe;
-  --code-bg: #f6f8fb;
+  --code-bg: #ffffff;
   --mono: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
 
   color: var(--text);
@@ -288,7 +288,14 @@ button {
 }
 
 .usage-code code {
+  display: block;
   font-family: inherit;
+  min-width: max-content;
+}
+
+.usage-code .line {
+  display: block;
+  min-height: 1.6em;
 }
 
 @media (max-width: 960px) {

@@ -17,13 +17,12 @@ export function InkTraceCanvas({
   onReady,
   preset = 'fountainPen',
   settings,
-  shape = 'rect',
   paths,
+  viewBox = null,
   seed = 1,
   width = INK_TRACE_WIDTH,
   height = INK_TRACE_HEIGHT,
   backgroundColor = null,
-  drawLabels = true,
   ariaLabel,
   'aria-label': ariaLabelAttr
 }: InkTraceCanvasProps) {
@@ -47,15 +46,14 @@ export function InkTraceCanvas({
     controllerRef.current?.update({
       preset,
       settings,
-      shape,
       paths,
+      viewBox,
       seed,
       width,
       height,
-      backgroundColor,
-      drawLabels
+      backgroundColor
     });
-  }, [backgroundColor, drawLabels, height, paths, preset, seed, settings, shape, width]);
+  }, [backgroundColor, height, paths, preset, seed, settings, viewBox, width]);
 
   return (
     <canvas

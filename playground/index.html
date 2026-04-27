@@ -37,9 +37,8 @@
               </select>
             </label>
             <label>
-              <span>Shape</span>
-              <select id="shape-select">
-                <option value="all">All presets</option>
+              <span>Path</span>
+              <select id="path-select">
                 <option value="bezier">Bezier</option>
                 <option value="line">Line</option>
                 <option value="rect" selected>Rectangle</option>
@@ -64,16 +63,16 @@
 
           <fieldset>
             <legend>Nib</legend>
-            <label><span>Width</span><input id="nib-width" type="range" min="0.5" max="6" step="0.1" /><output id="nib-width-value"></output></label>
-            <label><span>Angle</span><input id="nib-angle" type="range" min="0" max="180" step="5" /><output id="nib-angle-value"></output></label>
-            <label><span>Flatness</span><input id="nib-flatness" type="range" min="0" max="1" step="0.05" /><output id="nib-flatness-value"></output></label>
-            <label><span>Split width</span><input id="nib-split-width" type="range" min="0" max="3" step="0.1" /><output id="nib-split-width-value"></output></label>
+            <label><span>Width</span><input id="nib-width" type="range" min="0.1" max="16" step="0.1" /><output id="nib-width-value"></output></label>
+            <label><span>Angle</span><input id="nib-angle" type="range" min="-180" max="180" step="5" /><output id="nib-angle-value"></output></label>
+            <label><span>Flatness</span><input id="nib-flatness" type="range" min="0" max="1.2" step="0.05" /><output id="nib-flatness-value"></output></label>
+            <label><span>Split width</span><input id="nib-split-width" type="range" min="0" max="12" step="0.1" /><output id="nib-split-width-value"></output></label>
             <label><span>Split alpha</span><input id="nib-split-alpha" type="range" min="0" max="1" step="0.05" /><output id="nib-split-alpha-value"></output></label>
           </fieldset>
 
           <fieldset>
             <legend>Taper</legend>
-            <label><span>Variation</span><input id="taper-variation" type="range" min="0" max="1" step="0.05" /><output id="taper-variation-value"></output></label>
+            <label><span>Variation</span><input id="taper-variation" type="range" min="0" max="2" step="0.05" /><output id="taper-variation-value"></output></label>
             <label>
               <span>Profile</span>
               <select id="taper-profile">
@@ -84,8 +83,8 @@
                 <option value="tapered">Tapered</option>
               </select>
             </label>
-            <label><span>Start tip</span><input id="taper-start-tip" type="range" min="0" max="0.3" step="0.01" /><output id="taper-start-tip-value"></output></label>
-            <label><span>End tip</span><input id="taper-end-tip" type="range" min="0" max="0.3" step="0.01" /><output id="taper-end-tip-value"></output></label>
+            <label><span>Start tip</span><input id="taper-start-tip" type="range" min="0" max="0.8" step="0.01" /><output id="taper-start-tip-value"></output></label>
+            <label><span>End tip</span><input id="taper-end-tip" type="range" min="0" max="0.8" step="0.01" /><output id="taper-end-tip-value"></output></label>
             <label>
               <span>Tip style</span>
               <select id="taper-tip-style">
@@ -99,17 +98,17 @@
 
           <fieldset>
             <legend>Jitter</legend>
-            <label><span>Low freq</span><input id="jitter-low" type="range" min="0" max="3" step="0.1" /><output id="jitter-low-value"></output></label>
-            <label><span>High freq</span><input id="jitter-high" type="range" min="0" max="2" step="0.1" /><output id="jitter-high-value"></output></label>
-            <label><span>Path deform</span><input id="jitter-deform" type="range" min="0" max="3" step="0.1" /><output id="jitter-deform-value"></output></label>
-            <label><span>Edge rough</span><input id="jitter-edge" type="range" min="0" max="1" step="0.05" /><output id="jitter-edge-value"></output></label>
+            <label><span>Low freq</span><input id="jitter-low" type="range" min="0" max="8" step="0.1" /><output id="jitter-low-value"></output></label>
+            <label><span>High freq</span><input id="jitter-high" type="range" min="0" max="8" step="0.1" /><output id="jitter-high-value"></output></label>
+            <label><span>Path deform</span><input id="jitter-deform" type="range" min="0" max="8" step="0.1" /><output id="jitter-deform-value"></output></label>
+            <label><span>Edge rough</span><input id="jitter-edge" type="range" min="0" max="2" step="0.05" /><output id="jitter-edge-value"></output></label>
           </fieldset>
 
           <fieldset>
             <legend>Flow</legend>
-            <label><span>Segmentation</span><input id="flow-segmentation" type="range" min="0" max="3" step="0.1" /><output id="flow-segmentation-value"></output></label>
-            <label><span>Scale</span><input id="flow-scale" type="range" min="50" max="500" step="10" /><output id="flow-scale-value"></output></label>
-            <label><span>Min flow</span><input id="flow-min" type="range" min="0" max="0.9" step="0.05" /><output id="flow-min-value"></output></label>
+            <label><span>Segmentation</span><input id="flow-segmentation" type="range" min="0" max="8" step="0.1" /><output id="flow-segmentation-value"></output></label>
+            <label><span>Scale</span><input id="flow-scale" type="range" min="10" max="1200" step="10" /><output id="flow-scale-value"></output></label>
+            <label><span>Min flow</span><input id="flow-min" type="range" min="0" max="1.2" step="0.05" /><output id="flow-min-value"></output></label>
             <label>
               <span>Speed</span>
               <select id="flow-speed">
@@ -122,17 +121,17 @@
 
           <fieldset>
             <legend>Dry Pen</legend>
-            <label><span>Grain density</span><input id="dry-density" type="range" min="0" max="2" step="0.05" /><output id="dry-density-value"></output></label>
-            <label><span>Grain length</span><input id="dry-length" type="range" min="0.2" max="3" step="0.1" /><output id="dry-length-value"></output></label>
+            <label><span>Grain density</span><input id="dry-density" type="range" min="0" max="5" step="0.05" /><output id="dry-density-value"></output></label>
+            <label><span>Grain length</span><input id="dry-length" type="range" min="0.1" max="8" step="0.1" /><output id="dry-length-value"></output></label>
             <label><span>Grain alpha</span><input id="dry-alpha" type="range" min="0" max="1" step="0.05" /><output id="dry-alpha-value"></output></label>
           </fieldset>
 
           <fieldset>
             <legend>Splatter</legend>
-            <label><span>Intensity</span><input id="splatter-intensity" type="range" min="0" max="2" step="0.1" /><output id="splatter-intensity-value"></output></label>
-            <label><span>Density</span><input id="splatter-density" type="range" min="0" max="3" step="0.1" /><output id="splatter-density-value"></output></label>
-            <label><span>Spread</span><input id="splatter-spread" type="range" min="0.5" max="6" step="0.1" /><output id="splatter-spread-value"></output></label>
-            <label><span>Size variance</span><input id="splatter-size" type="range" min="0" max="1" step="0.05" /><output id="splatter-size-value"></output></label>
+            <label><span>Intensity</span><input id="splatter-intensity" type="range" min="0" max="6" step="0.1" /><output id="splatter-intensity-value"></output></label>
+            <label><span>Density</span><input id="splatter-density" type="range" min="0" max="8" step="0.1" /><output id="splatter-density-value"></output></label>
+            <label><span>Spread</span><input id="splatter-spread" type="range" min="0.1" max="18" step="0.1" /><output id="splatter-spread-value"></output></label>
+            <label><span>Size variance</span><input id="splatter-size" type="range" min="0" max="3" step="0.05" /><output id="splatter-size-value"></output></label>
             <label><span>Clustering</span><input id="splatter-cluster" type="range" min="0" max="1" step="0.05" /><output id="splatter-cluster-value"></output></label>
             <label>
               <span>Shape</span>
@@ -142,16 +141,16 @@
                 <option value="mixed">Mixed</option>
               </select>
             </label>
-            <label><span>Corner boost</span><input id="splatter-corner" type="range" min="0" max="3" step="0.1" /><output id="splatter-corner-value"></output></label>
-            <label><span>Skip ends</span><input id="splatter-skip" type="range" min="0" max="0.3" step="0.01" /><output id="splatter-skip-value"></output></label>
+            <label><span>Corner boost</span><input id="splatter-corner" type="range" min="0" max="8" step="0.1" /><output id="splatter-corner-value"></output></label>
+            <label><span>Skip ends</span><input id="splatter-skip" type="range" min="0" max="0.8" step="0.01" /><output id="splatter-skip-value"></output></label>
           </fieldset>
 
           <fieldset>
             <legend>Ink</legend>
             <label><span>Color</span><input id="ink-color" type="color" /><output id="ink-color-value"></output></label>
-            <label><span>Flow dark</span><input id="ink-darkness" type="range" min="0" max="1" step="0.05" /><output id="ink-darkness-value"></output></label>
-            <label><span>Hue jitter</span><input id="ink-hue" type="range" min="0" max="30" step="1" /><output id="ink-hue-value"></output></label>
-            <label><span>Alpha</span><input id="ink-alpha" type="range" min="0.3" max="1" step="0.05" /><output id="ink-alpha-value"></output></label>
+            <label><span>Flow dark</span><input id="ink-darkness" type="range" min="0" max="2" step="0.05" /><output id="ink-darkness-value"></output></label>
+            <label><span>Hue jitter</span><input id="ink-hue" type="range" min="0" max="90" step="1" /><output id="ink-hue-value"></output></label>
+            <label><span>Alpha</span><input id="ink-alpha" type="range" min="0.05" max="1" step="0.05" /><output id="ink-alpha-value"></output></label>
           </fieldset>
         </aside>
 

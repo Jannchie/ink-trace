@@ -8,17 +8,6 @@ export type InkTracePresetName =
   | 'calligraphy'
   | 'sketch';
 
-export type InkTraceShapeName =
-  | 'bezier'
-  | 'line'
-  | 'rect'
-  | 'circle'
-  | 'triangle'
-  | 'arrow'
-  | 'flowchart'
-  | 'signature'
-  | 'all';
-
 export type InkTraceTaperProfile = 'uniform' | 'centerHeavy' | 'startHeavy' | 'endHeavy' | 'tapered';
 export type InkTraceTipStyle = 'sharp' | 'blunt' | 'pause' | 'hook';
 export type InkTraceSpeedSimulation = 'none' | 'cornerSlow' | 'straightFast';
@@ -103,18 +92,27 @@ export interface InkTracePathItem {
   closed?: boolean;
   fill?: boolean;
   label?: string;
+  dashArray?: string | number[];
+  dashOffset?: number;
+  pathLength?: number;
+}
+
+export interface InkTraceViewBox {
+  x?: number;
+  y?: number;
+  width: number;
+  height: number;
 }
 
 export interface InkTraceOptions {
   preset?: InkTracePresetName | InkTracePreset;
   settings?: InkTracePresetPatch;
-  shape?: InkTraceShapeName;
   paths?: InkTracePathItem[];
+  viewBox?: string | InkTraceViewBox | null;
   seed?: number;
   width?: number;
   height?: number;
   backgroundColor?: string | null;
-  drawLabels?: boolean;
 }
 
 export interface InkTraceController {
@@ -124,10 +122,11 @@ export interface InkTraceController {
   destroy(): void;
 }
 
-interface ResolvedInkTraceOptions extends Required<Pick<InkTraceOptions, 'shape' | 'seed' | 'width' | 'height' | 'drawLabels'>> {
+interface ResolvedInkTraceOptions extends Required<Pick<InkTraceOptions, 'seed' | 'width' | 'height'>> {
   preset: InkTracePresetName | InkTracePreset;
   settings?: InkTracePresetPatch;
-  paths?: InkTracePathItem[];
+  paths: InkTracePathItem[];
+  viewBox: string | InkTraceViewBox | null;
   backgroundColor: string | null;
 }
 
@@ -181,13 +180,13 @@ export const INK_TRACE_PRESETS: Record<InkTracePresetName, InkTracePreset> = {
     ink: { color: '#0a0805', flowDarkness: 0.7, hueJitter: 4, alpha: 1 }
   },
   dipPen: {
-    nib: { width: 1.8, angle: 30, flatness: 0.5, splitWidth: 1.8, splitAlpha: 0.6 },
-    taper: { variation: 0.85, profile: 'uniform', startTip: 0.04, endTip: 0.04, tipStyle: 'sharp' },
-    jitter: { lowFreq: 0.7, highFreq: 0.4, pathDeform: 0.6, edgeRoughness: 0.4 },
-    flow: { segmentation: 2.8, segmentScale: 130, minFlow: 0.28, speedSim: 'none' },
-    drypen: { grainDensity: 1.2, grainLength: 1.5, grainAlpha: 0.95 },
-    splatter: { intensity: 1.8, density: 1.8, spread: 5, sizeVariance: 0.85, clustering: 0.85, shape: 'mixed', cornerBoost: 2.5, skipEnds: 0.06 },
-    ink: { color: '#08060a', flowDarkness: 0.7, hueJitter: 12, alpha: 1 }
+    nib: { width: 1.8, angle: 45, flatness: 0.2, splitWidth: 0, splitAlpha: 0 },
+    taper: { variation: 0.4, profile: 'uniform', startTip: 0.08, endTip: 0.08, tipStyle: 'sharp' },
+    jitter: { lowFreq: 0.5, highFreq: 0.2, pathDeform: 0.4, edgeRoughness: 0.2 },
+    flow: { segmentation: 2.7, segmentScale: 50, minFlow: 0.4, speedSim: 'none' },
+    drypen: { grainDensity: 0.6, grainLength: 1, grainAlpha: 0.85 },
+    splatter: { intensity: 1.4, density: 0.7, spread: 1.8, sizeVariance: 0.25, clustering: 0.3, shape: 'circle', cornerBoost: 1.2, skipEnds: 0.08 },
+    ink: { color: '#1a1410', flowDarkness: 0.35, hueJitter: 5, alpha: 1 }
   },
   ballpoint: {
     nib: { width: 0.8, angle: 0, flatness: 0, splitWidth: 0, splitAlpha: 0 },
@@ -227,37 +226,14 @@ export const INK_TRACE_PRESETS: Record<InkTracePresetName, InkTracePreset> = {
   }
 };
 
-export const INK_TRACE_SHAPES: Record<Exclude<InkTraceShapeName, 'all'>, InkTracePathItem[]> = {
-  line: [{ d: 'M 200 350 L 1160 350', closed: false }],
-  bezier: [{ d: 'M 200 550 C 400 150, 800 150, 1160 550', closed: false }],
-  rect: [{ d: 'M 400 200 L 960 200 L 960 500 L 400 500 Z', closed: true }],
-  circle: [{ d: 'M 680 350 m -200 0 a 200 200 0 1 0 400 0 a 200 200 0 1 0 -400 0', closed: true }],
-  triangle: [{ d: 'M 680 150 L 1000 530 L 360 530 Z', closed: true }],
-  arrow: [
-    { d: 'M 200 350 L 1080 350', closed: false },
-    { d: 'M 1080 350 L 1015 312', closed: false },
-    { d: 'M 1080 350 L 1015 388', closed: false }
-  ],
-  flowchart: [
-    { d: 'M 180 270 L 480 270 L 480 430 L 180 430 Z', closed: true },
-    { d: 'M 880 270 L 1180 270 L 1180 430 L 880 430 Z', closed: true },
-    { d: 'M 480 350 C 600 350, 760 350, 870 350', closed: false },
-    { d: 'M 870 350 L 820 325', closed: false },
-    { d: 'M 870 350 L 820 375', closed: false }
-  ],
-  signature: [
-    { d: 'M 200 400 C 280 320, 320 480, 400 380 C 460 320, 480 460, 560 360 C 640 280, 700 480, 800 380 C 880 300, 920 460, 1000 360', closed: false }
-  ]
-};
-
 const DEFAULT_OPTIONS: ResolvedInkTraceOptions = {
   preset: 'fountainPen',
-  shape: 'rect',
+  paths: [],
   seed: 1,
   width: INK_TRACE_WIDTH,
   height: INK_TRACE_HEIGHT,
-  backgroundColor: null,
-  drawLabels: true
+  viewBox: null,
+  backgroundColor: null
 };
 
 export function createInkTrace(canvas: HTMLCanvasElement, options: InkTraceOptions = {}): InkTraceController {
@@ -341,13 +317,12 @@ function mergeOptions(base: ResolvedInkTraceOptions, options: InkTraceOptions): 
     ...options,
     preset: options.preset ?? base.preset,
     settings: options.settings ?? base.settings,
-    shape: options.shape ?? base.shape,
     paths: options.paths ?? base.paths,
+    viewBox: options.viewBox === undefined ? base.viewBox : options.viewBox,
     seed: numberOrDefault(options.seed, base.seed),
     width: positiveNumberOrDefault(options.width, base.width),
     height: positiveNumberOrDefault(options.height, base.height),
-    backgroundColor: options.backgroundColor === undefined ? base.backgroundColor : options.backgroundColor,
-    drawLabels: options.drawLabels ?? base.drawLabels
+    backgroundColor: options.backgroundColor === undefined ? base.backgroundColor : options.backgroundColor
   };
 }
 
@@ -365,56 +340,20 @@ function renderCanvas(canvas: HTMLCanvasElement, options: ResolvedInkTraceOption
   }
 
   ctx.save();
-  ctx.scale(options.width / INK_TRACE_WIDTH, options.height / INK_TRACE_HEIGHT);
+  const viewBox = resolveViewBox(options.viewBox);
+  ctx.scale(options.width / viewBox.width, options.height / viewBox.height);
+  ctx.translate(-viewBox.x, -viewBox.y);
 
-  if (options.shape === 'all' && !options.paths) {
-    renderPresetGrid(ctx, options);
-  } else {
-    const preset = mergeInkTracePreset(options.preset, options.settings);
-    const paths = options.paths ?? getShapePaths(options.shape);
-    paths.forEach((path, index) => {
-      if (path.fill) {
-        fillPath(ctx, path.d, preset.ink);
-      } else {
-        renderInkPath(ctx, path.d, preset, options.seed + index * 7, path);
-      }
-    });
-  }
-
-  ctx.restore();
-}
-
-function renderPresetGrid(ctx: CanvasRenderingContext2D, options: ResolvedInkTraceOptions): void {
-  const names = Object.keys(INK_TRACE_PRESETS) as InkTracePresetName[];
-  const cols = 4;
-  const rows = 2;
-  const cellW = INK_TRACE_WIDTH / cols;
-  const cellH = INK_TRACE_HEIGHT / rows;
-
-  names.forEach((name, index) => {
-    const row = Math.floor(index / cols);
-    const col = index % cols;
-    const cx = col * cellW + cellW / 2;
-    const cy = row * cellH + cellH / 2;
-    const scale = Math.min(cellW, cellH) / 700 * 0.85;
-    const x0 = cx - 450 * scale;
-    const d = `M ${x0} ${cy} C ${x0 + 80 * scale} ${cy - 80 * scale}, ${x0 + 120 * scale} ${cy + 80 * scale}, ${x0 + 200 * scale} ${cy - 20 * scale} C ${x0 + 260 * scale} ${cy - 80 * scale}, ${x0 + 280 * scale} ${cy + 60 * scale}, ${x0 + 360 * scale} ${cy - 40 * scale} C ${x0 + 440 * scale} ${cy - 120 * scale}, ${x0 + 500 * scale} ${cy + 80 * scale}, ${x0 + 600 * scale} ${cy - 20 * scale} C ${x0 + 680 * scale} ${cy - 100 * scale}, ${x0 + 720 * scale} ${cy + 60 * scale}, ${x0 + 800 * scale} ${cy - 40 * scale} L ${x0 + 900 * scale} ${cy - 40 * scale}`;
-    const preset = cloneInkTracePreset(name);
-    preset.nib.width *= scale * 1.4;
-    renderInkPath(ctx, d, preset, options.seed + index * 17, { closed: false });
-
-    if (options.drawLabels) {
-      ctx.fillStyle = 'rgba(71, 85, 105, 0.8)';
-      ctx.font = '13px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'alphabetic';
-      ctx.fillText(name, cx, row * cellH + 22);
+  const preset = mergeInkTracePreset(options.preset, options.settings);
+  options.paths.forEach((path, index) => {
+    if (path.fill) {
+      fillPath(ctx, path.d, preset.ink);
+    } else {
+      renderInkPath(ctx, path.d, preset, options.seed + index * 7, path);
     }
   });
-}
 
-function getShapePaths(shape: InkTraceShapeName): InkTracePathItem[] {
-  return shape === 'all' ? INK_TRACE_SHAPES.signature : INK_TRACE_SHAPES[shape];
+  ctx.restore();
 }
 
 function renderInkPath(
@@ -422,14 +361,26 @@ function renderInkPath(
   d: string,
   preset: InkTracePreset,
   seed: number,
-  item: Pick<InkTracePathItem, 'closed'>
+  item: Pick<InkTracePathItem, 'closed' | 'dashArray' | 'dashOffset' | 'pathLength'>
 ): void {
   const sample = samplePath(d, 1, ctx.canvas.ownerDocument);
   if (!sample || sample.points.length < 2) return;
 
-  const points = sample.points;
-  const len = sample.length;
-  const { nib, taper, jitter, flow, drypen, splatter, ink } = preset;
+  const segments = splitDashedSegments(sample.points, sample.length, item);
+  segments.forEach((segment, index) => {
+    renderSampledInkPath(ctx, segment.points, segment.length, preset, seed + index * 13, item.closed && segments.length === 1);
+  });
+}
+
+function renderSampledInkPath(
+  ctx: CanvasRenderingContext2D,
+  points: SampledPoint[],
+  len: number,
+  preset: InkTracePreset,
+  seed: number,
+  closed = false
+): void {
+  const { jitter, flow, ink } = preset;
   const inkA = ink.alpha ?? 1;
 
   deformPath(points, jitter, seed);
@@ -438,10 +389,102 @@ function renderInkPath(
 
   const corners = findCorners(points);
   const flowArr = resolveFlow(points, flow, corners, seed);
-  resolveWidths(points, len, preset, flowArr, seed, item.closed);
+  resolveWidths(points, len, preset, flowArr, seed, closed);
   drawFlowingStroke(ctx, points, flowArr, preset, seed);
   drawSplitNib(ctx, points, flowArr, preset, inkA);
   drawSplatter(ctx, points, len, corners, flowArr, preset, seed);
+}
+
+function splitDashedSegments(
+  points: SampledPoint[],
+  length: number,
+  item: Pick<InkTracePathItem, 'dashArray' | 'dashOffset' | 'pathLength'>
+): Array<{ points: SampledPoint[]; length: number }> {
+  const dashArray = parseDashArray(item.dashArray);
+  if (!dashArray.length) return [{ points, length }];
+
+  const scale = item.pathLength && item.pathLength > 0 ? length / item.pathLength : 1;
+  const pattern = normalizeDashArray(dashArray.map((value) => value * scale));
+  const patternLength = pattern.reduce((sum, value) => sum + value, 0);
+  if (patternLength <= 0) return [{ points, length }];
+
+  const dashOffset = ((numberOrDefault(item.dashOffset, 0) * scale) % patternLength + patternLength) % patternLength;
+  const segments: Array<{ points: SampledPoint[]; length: number }> = [];
+  let distance = -dashOffset;
+  let patternIndex = 0;
+
+  while (distance < length) {
+    const pieceLength = pattern[patternIndex % pattern.length] ?? 0;
+    const start = Math.max(0, distance);
+    const end = Math.min(length, distance + pieceLength);
+
+    if (patternIndex % 2 === 0 && end > start) {
+      const segmentPoints = slicePoints(points, start, end);
+      if (segmentPoints.length >= 2) {
+        segments.push({ points: segmentPoints, length: end - start });
+      }
+    }
+
+    distance += pieceLength;
+    patternIndex++;
+  }
+
+  return segments;
+}
+
+function parseDashArray(dashArray: string | number[] | undefined): number[] {
+  if (!dashArray) return [];
+
+  const values = Array.isArray(dashArray)
+    ? dashArray
+    : dashArray.split(/[\s,]+/).map(Number);
+
+  return values.filter((value) => Number.isFinite(value) && value > 0);
+}
+
+function normalizeDashArray(dashArray: number[]): number[] {
+  return dashArray.length % 2 === 1 ? [...dashArray, ...dashArray] : dashArray;
+}
+
+function slicePoints(points: SampledPoint[], start: number, end: number): SampledPoint[] {
+  const sliced = [
+    interpolatePointAtDistance(points, start),
+    ...points.filter((point) => point.s > start && point.s < end),
+    interpolatePointAtDistance(points, end)
+  ];
+
+  return sliced.map((point) => ({
+    ...point,
+    s: point.s - start
+  }));
+}
+
+function interpolatePointAtDistance(points: SampledPoint[], distance: number): SampledPoint {
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (!first || !last || distance <= first.s) return { ...(first ?? { x: 0, y: 0, s: 0, tx: 0, ty: 0, nx: 0, ny: 0, w: 1 }) };
+  if (distance >= last.s) return { ...last };
+
+  for (let index = 1; index < points.length; index++) {
+    const previous = points[index - 1];
+    const next = points[index];
+    if (!previous || !next || next.s < distance) continue;
+
+    const span = next.s - previous.s || 1;
+    const t = (distance - previous.s) / span;
+    return {
+      x: previous.x + (next.x - previous.x) * t,
+      y: previous.y + (next.y - previous.y) * t,
+      s: distance,
+      tx: 0,
+      ty: 0,
+      nx: 0,
+      ny: 0,
+      w: 1
+    };
+  }
+
+  return { ...last };
 }
 
 function deformPath(points: SampledPoint[], jitter: InkTraceJitter, seed: number): void {
@@ -1018,6 +1061,26 @@ function hexToRgb(hex: string): [number, number, number] {
 
 function rgbToHex(r: number, g: number, b: number): string {
   return `#${[r, g, b].map((value) => clamp(Math.round(value), 0, 255).toString(16).padStart(2, '0')).join('')}`;
+}
+
+function resolveViewBox(input: string | InkTraceViewBox | null): Required<InkTraceViewBox> {
+  if (typeof input === 'string') {
+    const values = input.trim().split(/[\s,]+/).map(Number);
+    if (values.length === 4) {
+      const [x, y, width, height] = values;
+      if ([x, y, width, height].every((value) => Number.isFinite(value)) && width > 0 && height > 0) {
+        return { x, y, width, height };
+      }
+    }
+  } else if (input) {
+    const x = numberOrDefault(input.x, 0);
+    const y = numberOrDefault(input.y, 0);
+    const width = positiveNumberOrDefault(input.width, INK_TRACE_WIDTH);
+    const height = positiveNumberOrDefault(input.height, INK_TRACE_HEIGHT);
+    return { x, y, width, height };
+  }
+
+  return { x: 0, y: 0, width: INK_TRACE_WIDTH, height: INK_TRACE_HEIGHT };
 }
 
 function numberOrDefault(value: number | undefined, fallback: number): number {
