@@ -13,8 +13,10 @@
     "check": "pnpm -r --if-present check",
     "dev": "pnpm --filter ink-trace-playground dev",
     "playground": "pnpm --filter ink-trace-playground dev",
+    "test": "pnpm -r --if-present test",
+    "bench:render": "node scripts/bench-render.mjs",
     "trust:github": "bash scripts/trust-publishers.sh",
-    "release": "pnpm check && pnpm build && pnpm -r publish --access public"
+    "release": "pnpm check && pnpm test && pnpm build && pnpm -r publish --access public"
   },
   "devDependencies": {
     "@types/node": "^22.19.17",

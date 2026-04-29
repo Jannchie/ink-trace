@@ -3,12 +3,6 @@ import {
   cloneInkTracePreset,
   INK_TRACE_PRESETS
 } from '@ink-trace/core';
-import { jannchieLight } from '@jannchie/shiki-theme';
-import { createHighlighterCore } from 'shiki/core';
-import { createJavaScriptRegexEngine } from 'shiki/engine/javascript';
-import tsxLang from 'shiki/langs/tsx.mjs';
-import typescriptLang from 'shiki/langs/typescript.mjs';
-import vueLang from 'shiki/langs/vue.mjs';
 import type {
   InkTraceEasingName,
   InkTracePathItem,
@@ -24,6 +18,9 @@ type FieldMap = Record<string, readonly [PresetGroup, string]>;
 type SnippetTab = 'ts' | 'vue' | 'react';
 type SnippetLanguage = 'typescript' | 'vue' | 'tsx';
 type SnippetMap = Record<SnippetTab, string>;
+type SnippetHighlighter = {
+  codeToHtml: (code: string, options: { lang: SnippetLanguage; theme: ThemeRegistrationAny }) => string;
+};
 type EasingChoice = InkTraceEasingName;
 type PathExampleName =
   | 'bezier'
@@ -123,16 +120,11 @@ const snippetLanguages = {
   vue: 'vue',
   react: 'tsx'
 } as const satisfies Record<SnippetTab, SnippetLanguage>;
-const codeTheme = jannchieLight as ThemeRegistrationAny;
-const highlighterPromise = createHighlighterCore({
-  themes: [codeTheme],
-  langs: [typescriptLang, vueLang, tsxLang],
-  engine: createJavaScriptRegexEngine()
-});
 
 let seed = 1;
 let settings = cloneInkTracePreset('fountainPen');
 let snippetVersion = 0;
+let highlighterPromise: Promise<{ highlighter: SnippetHighlighter; theme: ThemeRegistrationAny }> | null = null;
 const trace = createInkTrace(canvas);
 
 syncSettingsToUI();
@@ -314,19 +306,41 @@ function updateSnippets(preset: PresetChoice, paths: InkTracePathItem[], progres
 
 async function highlightSnippets(snippets: SnippetMap, version: number): Promise<void> {
   try {
-    const highlighter = await highlighterPromise;
+    const { highlighter, theme } = await loadHighlighter();
     if (version !== snippetVersion) return;
 
     (Object.keys(snippets) as SnippetTab[]).forEach((tab) => {
       const html = highlighter.codeToHtml(snippets[tab], {
         lang: snippetLanguages[tab],
-        theme: codeTheme
+        theme
       });
       snippetTargets[tab].innerHTML = extractCodeHtml(html, snippets[tab]);
     });
   } catch (error) {
     console.error('Failed to highlight snippets', error);
   }
+}
+
+async function loadHighlighter(): Promise<{ highlighter: SnippetHighlighter; theme: ThemeRegistrationAny }> {
+  highlighterPromise ??= Promise.all([
+    import('@jannchie/shiki-theme'),
+    import('shiki/core'),
+    import('shiki/engine/javascript'),
+    import('shiki/langs/typescript.mjs'),
+    import('shiki/langs/vue.mjs'),
+    import('shiki/langs/tsx.mjs')
+  ]).then(async ([themeModule, coreModule, engineModule, typescriptLang, vueLang, tsxLang]) => {
+    const theme = themeModule.jannchieLight as ThemeRegistrationAny;
+    const highlighter = await coreModule.createHighlighterCore({
+      themes: [theme],
+      langs: [typescriptLang.default, vueLang.default, tsxLang.default],
+      engine: engineModule.createJavaScriptRegexEngine()
+    });
+
+    return { highlighter, theme };
+  });
+
+  return highlighterPromise;
 }
 
 function extractCodeHtml(html: string, fallback: string): string {

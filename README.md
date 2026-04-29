@@ -211,6 +211,8 @@ Allowed string values:
 
 ## Development
 
+Use Node.js 22 or newer. The core package depends on `svg-path-properties` 2.x, which requires Node.js 22+.
+
 ```bash
 pnpm install
 pnpm dev

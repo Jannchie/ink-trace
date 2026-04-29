@@ -4,6 +4,8 @@ Framework-agnostic Canvas ink stroke simulation.
 
 ## Installation
 
+Use Node.js 22 or newer when installing or building this package.
+
 ```bash
 pnpm add @ink-trace/core
 ```

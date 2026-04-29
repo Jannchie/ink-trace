@@ -183,6 +183,7 @@ export const INK_TRACE_WIDTH = 1360;
 export const INK_TRACE_HEIGHT = 700;
 
 const PATH_GEOMETRY_CACHE = new Map<string, PathGeometry>();
+const PATH_GEOMETRY_CACHE_LIMIT = 256;
 
 export const INK_TRACE_PRESETS: Record<InkTracePresetName, InkTracePreset> = {
   fountainPen: {
@@ -367,8 +368,16 @@ function readPathGeometry(path: InkTracePathItem): PathGeometry | null {
     strokeLength: segments.reduce((sum, segment) => sum + segment.length, 0),
     segments: cloneSegments(segments)
   };
-  PATH_GEOMETRY_CACHE.set(key, geometry);
+  writePathGeometryCache(key, geometry);
   return geometry;
+}
+
+function writePathGeometryCache(key: string, geometry: PathGeometry): void {
+  if (!PATH_GEOMETRY_CACHE.has(key) && PATH_GEOMETRY_CACHE.size >= PATH_GEOMETRY_CACHE_LIMIT) {
+    const oldestKey = PATH_GEOMETRY_CACHE.keys().next().value;
+    if (oldestKey !== undefined) PATH_GEOMETRY_CACHE.delete(oldestKey);
+  }
+  PATH_GEOMETRY_CACHE.set(key, geometry);
 }
 
 function createPathGeometryCacheKey(path: InkTracePathItem): string {
