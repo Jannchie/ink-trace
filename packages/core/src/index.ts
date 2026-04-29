@@ -309,7 +309,7 @@ export function drawInkPath(
   seed = 1,
   progress = 1
 ): void {
-  const resolved = cloneInkTracePreset(preset);
+  const resolved = resolvePresetInkColor(ctx, cloneInkTracePreset(preset));
   const prepared = preparePath(ctx, path, seed, 0);
   if (!prepared) return;
 
@@ -512,8 +512,8 @@ function mergeOptions(base: ResolvedInkTraceOptions, options: InkTraceOptions): 
     ...base,
     ...options,
     preset: options.preset ?? base.preset,
-    settings: options.settings ?? base.settings,
-    paths: options.paths ?? base.paths,
+    settings: hasOption(options, 'settings') ? options.settings : base.settings,
+    paths: hasOption(options, 'paths') ? options.paths ?? [] : base.paths,
     viewBox: options.viewBox === undefined ? base.viewBox : options.viewBox,
     seed: numberOrDefault(options.seed, base.seed),
     progress: clamp(numberOrDefault(options.progress, base.progress), 0, 1),
@@ -521,6 +521,10 @@ function mergeOptions(base: ResolvedInkTraceOptions, options: InkTraceOptions): 
     height: positiveNumberOrDefault(options.height, base.height),
     backgroundColor: options.backgroundColor === undefined ? base.backgroundColor : options.backgroundColor
   };
+}
+
+function hasOption(options: InkTraceOptions, key: keyof InkTraceOptions): boolean {
+  return Object.prototype.hasOwnProperty.call(options, key);
 }
 
 function renderCanvas(canvas: HTMLCanvasElement, options: ResolvedInkTraceOptions, pathProgresses?: number[]): void {
@@ -541,7 +545,7 @@ function renderCanvas(canvas: HTMLCanvasElement, options: ResolvedInkTraceOption
   ctx.scale(options.width / viewBox.width, options.height / viewBox.height);
   ctx.translate(-viewBox.x, -viewBox.y);
 
-  const preset = mergeInkTracePreset(options.preset, options.settings);
+  const preset = resolvePresetInkColor(ctx, mergeInkTracePreset(options.preset, options.settings));
   const preparedPaths = options.paths
     .map((path, index) => preparePath(ctx, path, options.seed + index * 7, index))
     .filter((path): path is PreparedPath => Boolean(path));
@@ -1260,6 +1264,29 @@ function fbm(x: number, seed: number): number {
   return noise1(x, seed) * 0.6 + noise1(x * 2.3, seed + 1) * 0.25 + noise1(x * 5.1, seed + 2) * 0.15;
 }
 
+function resolvePresetInkColor(ctx: CanvasRenderingContext2D, preset: InkTracePreset): InkTracePreset {
+  return {
+    ...preset,
+    ink: {
+      ...preset.ink,
+      color: resolveCanvasColor(ctx, preset.ink.color)
+    }
+  };
+}
+
+function resolveCanvasColor(ctx: CanvasRenderingContext2D, color: string): string {
+  const parsed = parseCanvasColor(color);
+  if (parsed) return parsed;
+
+  const previous = ctx.fillStyle;
+  ctx.fillStyle = '#000000';
+  ctx.fillStyle = color;
+  const resolved = typeof ctx.fillStyle === 'string' ? parseCanvasColor(ctx.fillStyle) : null;
+  ctx.fillStyle = previous;
+
+  return resolved ?? '#000000';
+}
+
 function shiftHue(hex: string, degrees: number, saturationMultiplier: number, lightnessMultiplier: number): string {
   const [r, g, b] = hexToRgb(hex);
   const rN = r / 255;
@@ -1305,12 +1332,28 @@ function hueToRgb(p: number, q: number, t: number): number {
 }
 
 function hexToRgb(hex: string): [number, number, number] {
-  const normalized = hex.replace('#', '').padEnd(6, '0').slice(0, 6);
+  const normalized = parseCanvasColor(hex) ?? '#000000';
   return [
-    parseInt(normalized.slice(0, 2), 16),
-    parseInt(normalized.slice(2, 4), 16),
-    parseInt(normalized.slice(4, 6), 16)
+    parseInt(normalized.slice(1, 3), 16),
+    parseInt(normalized.slice(3, 5), 16),
+    parseInt(normalized.slice(5, 7), 16)
   ];
+}
+
+function parseCanvasColor(color: string): string | null {
+  const value = color.trim();
+  const shortHex = /^#([0-9a-f]{3})$/i.exec(value);
+  if (shortHex) {
+    return `#${shortHex[1].split('').map((char) => char + char).join('').toLowerCase()}`;
+  }
+
+  const longHex = /^#([0-9a-f]{6})$/i.exec(value);
+  if (longHex) return `#${longHex[1].toLowerCase()}`;
+
+  const rgb = /^rgba?\(\s*([+-]?\d*\.?\d+)(?:\s*,\s*|\s+)([+-]?\d*\.?\d+)(?:\s*,\s*|\s+)([+-]?\d*\.?\d+)/i.exec(value);
+  if (!rgb) return null;
+
+  return rgbToHex(Number(rgb[1]), Number(rgb[2]), Number(rgb[3]));
 }
 
 function rgbToHex(r: number, g: number, b: number): string {

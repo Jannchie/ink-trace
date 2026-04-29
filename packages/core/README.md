@@ -107,6 +107,8 @@ createInkTrace(canvas, {
 | `splatter` | `intensity`, `density`, `spread`, `sizeVariance`, `clustering`, `shape`, `cornerBoost`, `skipEnds` |
 | `ink` | `color`, `flowDarkness`, `hueJitter`, `alpha` |
 
+Ink `color` values accept Canvas-supported CSS color strings. The renderer resolves them through Canvas and uses `ink.alpha` for stroke opacity.
+
 Allowed string values:
 
 | Field | Values |

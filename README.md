@@ -87,7 +87,7 @@ createInkTrace(canvas, {
   viewBox: "0 0 1440 320",
   paths: [
     {
-      d: "M 200 400 C 400 260, 760 540, 1100 340",
+      d: "M 200 180 C 400 80, 760 300, 1100 180",
       closed: false,
       dashArray: "40 18 42",
       pathLength: 100
@@ -190,6 +190,8 @@ Preset settings are grouped by section:
 | `drypen` | `grainDensity`, `grainLength`, `grainAlpha` |
 | `splatter` | `intensity`, `density`, `spread`, `sizeVariance`, `clustering`, `shape`, `cornerBoost`, `skipEnds` |
 | `ink` | `color`, `flowDarkness`, `hueJitter`, `alpha` |
+
+Ink `color` values accept Canvas-supported CSS color strings. The renderer resolves them through Canvas and uses `ink.alpha` for stroke opacity.
 
 Allowed string values:
 

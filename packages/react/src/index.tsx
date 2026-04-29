@@ -29,32 +29,38 @@ export function InkTraceCanvas({
 }: InkTraceCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const controllerRef = useRef<InkTraceController | null>(null);
+  const onReadyRef = useRef(onReady);
+  const readOptions = (): InkTraceOptions => ({
+    preset,
+    settings,
+    paths,
+    viewBox,
+    seed,
+    progress,
+    width,
+    height,
+    backgroundColor
+  });
+
+  useEffect(() => {
+    onReadyRef.current = onReady;
+  }, [onReady]);
 
   useEffect(() => {
     if (!canvasRef.current) return undefined;
 
-    const controller = createInkTrace(canvasRef.current);
+    const controller = createInkTrace(canvasRef.current, readOptions());
     controllerRef.current = controller;
-    onReady?.(controller);
+    onReadyRef.current?.(controller);
 
     return () => {
       controller.destroy();
       controllerRef.current = null;
     };
-  }, [onReady]);
+  }, []);
 
   useEffect(() => {
-    controllerRef.current?.update({
-      preset,
-      settings,
-      paths,
-      viewBox,
-      seed,
-      progress,
-      width,
-      height,
-      backgroundColor
-    });
+    controllerRef.current?.update(readOptions());
   }, [backgroundColor, height, paths, preset, progress, seed, settings, viewBox, width]);
 
   return (
