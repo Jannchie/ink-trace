@@ -1,6 +1,6 @@
 {
   "name": "@ink-trace/vue",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Vue component for canvas ink stroke simulation.",
   "type": "module",
   "repository": {
