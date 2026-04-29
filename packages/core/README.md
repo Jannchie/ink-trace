@@ -2,6 +2,14 @@
 
 Framework-agnostic Canvas ink stroke simulation.
 
+## Installation
+
+```bash
+pnpm add @ink-trace/core
+```
+
+## Usage
+
 ```ts
 import { createInkTrace } from "@ink-trace/core";
 
@@ -121,3 +129,5 @@ Built-in presets are `fountainPen`, `fineliner`, `brushPen`, `dipPen`, `ballpoin
 | `reseed(seed?)` | Renders with a provided seed or a random seed. |
 | `play(options?)` | Animates `progress` with optional `strokeDuration`, `strokeDelay`, `from`, `to`, `easing`, `onUpdate`, and `onFinish`. |
 | `destroy()` | Clears the canvas. |
+
+See the root README for package installation, release setup, and cross-framework examples: https://github.com/Jannchie/ink-trace#readme

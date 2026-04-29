@@ -2,6 +2,14 @@
 
 React component for Canvas ink stroke simulation.
 
+## Installation
+
+```bash
+pnpm add @ink-trace/core @ink-trace/react
+```
+
+## Usage
+
 ```tsx
 import { InkTraceCanvas } from "@ink-trace/react";
 
@@ -81,3 +89,5 @@ Allowed string values:
 | `taper.tipStyle` | `"sharp"`, `"blunt"`, `"pause"`, `"hook"` |
 | `flow.speedSim` | `"none"`, `"cornerSlow"`, `"straightFast"` |
 | `splatter.shape` | `"circle"`, `"ellipse"`, `"mixed"` |
+
+See the root README for package installation, release setup, and core renderer examples: https://github.com/Jannchie/ink-trace#readme

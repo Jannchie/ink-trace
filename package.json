@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@10.28.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Jannchie/ink-trace.git"
@@ -12,9 +13,11 @@
     "check": "pnpm -r --if-present check",
     "dev": "pnpm --filter ink-trace-playground dev",
     "playground": "pnpm --filter ink-trace-playground dev",
+    "trust:github": "bash scripts/trust-publishers.sh",
     "release": "pnpm check && pnpm build && pnpm -r publish --access public"
   },
   "devDependencies": {
+    "@types/node": "^22.19.17",
     "@types/react": "^19.2.14",
     "react": "^19.2.3",
     "tsup": "^8.5.1",

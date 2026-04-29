@@ -1,15 +1,25 @@
 # Ink Trace
 
-Canvas ink stroke simulation extracted from `ink_engine_full_transparent.html`.
+Ink Trace renders SVG path data as simulated ink strokes on Canvas. It ships a framework-agnostic core package plus React and Vue bindings.
 
-## Packages
+## Installation
 
-- `@ink-trace/core`: framework-agnostic Canvas renderer.
-- `@ink-trace/react`: React canvas component.
-- `@ink-trace/vue`: Vue canvas component.
-- `ink-trace-playground`: native TypeScript playground for preset tuning.
+Install the core package when you want to render into an existing canvas element:
 
-## Usage
+```bash
+pnpm add @ink-trace/core
+```
+
+Install the matching framework binding for React or Vue:
+
+```bash
+pnpm add @ink-trace/core @ink-trace/react
+pnpm add @ink-trace/core @ink-trace/vue
+```
+
+## Quick Start
+
+### Core
 
 ```ts
 import { createInkTrace } from "@ink-trace/core";
@@ -29,7 +39,7 @@ createInkTrace(canvas, {
 }).render();
 ```
 
-React:
+### React
 
 ```tsx
 import { InkTraceCanvas } from "@ink-trace/react";
@@ -42,11 +52,11 @@ const paths = [
 ];
 
 export function Demo() {
-  return <InkTraceCanvas preset="brushPen" paths={paths} />;
+  return <InkTraceCanvas preset="brushPen" paths={paths} aria-label="Brush pen signature" />;
 }
 ```
 
-Vue:
+### Vue
 
 ```vue
 <script setup lang="ts">
@@ -61,22 +71,11 @@ const paths = [
 </script>
 
 <template>
-  <InkTraceCanvas preset="brushPen" :paths="paths" />
+  <InkTraceCanvas preset="brushPen" :paths="paths" aria-label="Brush pen signature" />
 </template>
 ```
 
-## Presets And Paths
-
-Built-in presets:
-
-- `fountainPen`
-- `fineliner`
-- `brushPen`
-- `dipPen`
-- `ballpoint`
-- `marker`
-- `calligraphy`
-- `sketch`
+## Paths And Canvas Coordinates
 
 Pass `paths` with SVG path data:
 
@@ -98,23 +97,37 @@ createInkTrace(canvas, {
 ```
 
 Use `viewBox` when your path data comes from an existing SVG and you want the canvas to preserve that coordinate system.
+
 The canvas is transparent by default. Use CSS on the parent element for preview backgrounds, or pass `backgroundColor` when you want the renderer to fill the canvas.
 
-## Configuration
+## Presets
 
-Core renderer options:
+Built-in presets:
 
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `preset` | `InkTracePresetName \| InkTracePreset` | `"fountainPen"` | Built-in preset name or a full custom preset object. |
-| `settings` | `InkTracePresetPatch` | `undefined` | Partial preset overrides grouped by `nib`, `taper`, `jitter`, `flow`, `drypen`, `splatter`, and `ink`. |
-| `paths` | `InkTracePathItem[]` | `[]` | SVG path data items to render. |
-| `viewBox` | `string \| InkTraceViewBox \| null` | `null` | Source coordinate system, such as `"0 0 1360 700"` or `{ x, y, width, height }`. |
-| `seed` | `number` | `1` | Deterministic variation seed. Use the same seed for repeatable output. |
-| `progress` | `number` | `1` | Stroke reveal progress from `0` to `1`. Strokes grow in path order while keeping width, jitter, grain, and splatter stable for the same seed. |
-| `width` | `number` | `1360` | Canvas bitmap width. |
-| `height` | `number` | `700` | Canvas bitmap height. |
-| `backgroundColor` | `string \| null` | `null` | Optional canvas fill color. Leave `null` for transparent output. |
+- `fountainPen`
+- `fineliner`
+- `brushPen`
+- `dipPen`
+- `ballpoint`
+- `marker`
+- `calligraphy`
+- `sketch`
+
+Use `settings` to override only the preset fields you need:
+
+```ts
+createInkTrace(canvas, {
+  preset: "brushPen",
+  settings: {
+    nib: { width: 5 },
+    ink: { color: "#111111", alpha: 0.9 },
+    splatter: { intensity: 0.2 }
+  },
+  paths
+}).render();
+```
+
+## Animation
 
 Animate stroke growth with `play()`:
 
@@ -137,6 +150,22 @@ It accepts `strokeDuration`, `strokeDelay`, `from`, `to`, `easing`, `onUpdate`, 
 `strokeDelay` is the start-time offset between adjacent path items; use `0` for simultaneous strokes or the same value as `strokeDuration` for sequential strokes.
 If `strokeDuration` is not set, `duration` is used as a fallback.
 `easing` defaults to `"easeInOut"` and can be `"linear"`, `"easeIn"`, `"easeOut"`, `"easeInOut"`, or a custom `(t) => number` function.
+
+## Configuration
+
+Core renderer options:
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `preset` | `InkTracePresetName \| InkTracePreset` | `"fountainPen"` | Built-in preset name or a full custom preset object. |
+| `settings` | `InkTracePresetPatch` | `undefined` | Partial preset overrides grouped by `nib`, `taper`, `jitter`, `flow`, `drypen`, `splatter`, and `ink`. |
+| `paths` | `InkTracePathItem[]` | `[]` | SVG path data items to render. |
+| `viewBox` | `string \| InkTraceViewBox \| null` | `null` | Source coordinate system, such as `"0 0 1360 700"` or `{ x, y, width, height }`. |
+| `seed` | `number` | `1` | Deterministic variation seed. Use the same seed for repeatable output. |
+| `progress` | `number` | `1` | Stroke reveal progress from `0` to `1`. Strokes grow in path order while keeping width, jitter, grain, and splatter stable for the same seed. |
+| `width` | `number` | `1360` | Canvas bitmap width. |
+| `height` | `number` | `700` | Canvas bitmap height. |
+| `backgroundColor` | `string \| null` | `null` | Optional canvas fill color. Leave `null` for transparent output. |
 
 Path item options:
 
@@ -171,6 +200,13 @@ Allowed string values:
 | `flow.speedSim` | `"none"`, `"cornerSlow"`, `"straightFast"` |
 | `splatter.shape` | `"circle"`, `"ellipse"`, `"mixed"` |
 
+## Packages
+
+- `@ink-trace/core`: framework-agnostic Canvas renderer.
+- `@ink-trace/react`: React canvas component.
+- `@ink-trace/vue`: Vue canvas component.
+- `ink-trace-playground`: native TypeScript playground for preset tuning.
+
 ## Development
 
 ```bash
@@ -184,8 +220,24 @@ Build all packages and the playground:
 pnpm build
 ```
 
-Publish public packages:
+Run type checks:
 
 ```bash
-pnpm run release
+pnpm check
+```
+
+## Release
+
+Releases are published by the GitHub Actions release workflow when a `v*.*.*` tag is pushed.
+
+Before the first trusted publish from a repository, configure npm trusted publishing for all packages:
+
+```bash
+pnpm trust:github Jannchie/ink-trace
+```
+
+Use a different repository, workflow file, or npm environment when needed:
+
+```bash
+pnpm trust:github owner/repo release.yml npm
 ```

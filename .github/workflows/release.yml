@@ -3,29 +3,34 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      - "v*.*.*"
+  workflow_dispatch:
 
 permissions:
   contents: read
   id-token: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: npm
+    if: github.repository == 'Jannchie/ink-trace'
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 22.14.0
           registry-url: https://registry.npmjs.org
           cache: pnpm
 
@@ -41,15 +46,22 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Pack packages
+      - name: Pack and publish packages
+        shell: bash
         run: |
-          mkdir -p .release
-          pnpm --filter @ink-trace/core pack --pack-destination .release
-          pnpm --filter @ink-trace/react pack --pack-destination .release
-          pnpm --filter @ink-trace/vue pack --pack-destination .release
+          set -euo pipefail
 
-      - name: Publish packages
-        run: |
-          npm publish .release/ink-trace-core-*.tgz --access public
-          npm publish .release/ink-trace-react-*.tgz --access public
-          npm publish .release/ink-trace-vue-*.tgz --access public
+          pack_dir="$RUNNER_TEMP/ink-trace-packs"
+          packages=(
+            "@ink-trace/core"
+            "@ink-trace/react"
+            "@ink-trace/vue"
+          )
+
+          mkdir -p "$pack_dir"
+
+          for package in "${packages[@]}"; do
+            rm -f "$pack_dir"/*.tgz
+            pnpm --filter "$package" pack --pack-destination "$pack_dir"
+            npm publish "$pack_dir"/*.tgz --access public
+          done
