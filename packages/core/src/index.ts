@@ -357,7 +357,10 @@ function preparePath(path: InkTracePathItem, seed: number, index: number): Prepa
 function readPathGeometry(path: InkTracePathItem): PathGeometry | null {
   const key = createPathGeometryCacheKey(path);
   const cached = PATH_GEOMETRY_CACHE.get(key);
-  if (cached) return cached;
+  if (cached) {
+    writePathGeometryCache(key, cached);
+    return cached;
+  }
 
   const sample = samplePath(path.d, 1);
   if (!sample || sample.points.length < 2) return null;
@@ -373,7 +376,9 @@ function readPathGeometry(path: InkTracePathItem): PathGeometry | null {
 }
 
 function writePathGeometryCache(key: string, geometry: PathGeometry): void {
-  if (!PATH_GEOMETRY_CACHE.has(key) && PATH_GEOMETRY_CACHE.size >= PATH_GEOMETRY_CACHE_LIMIT) {
+  if (PATH_GEOMETRY_CACHE.has(key)) {
+    PATH_GEOMETRY_CACHE.delete(key);
+  } else if (PATH_GEOMETRY_CACHE.size >= PATH_GEOMETRY_CACHE_LIMIT) {
     const oldestKey = PATH_GEOMETRY_CACHE.keys().next().value;
     if (oldestKey !== undefined) PATH_GEOMETRY_CACHE.delete(oldestKey);
   }
