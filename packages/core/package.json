@@ -27,5 +27,12 @@
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --clean",
     "check": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "d3-color": "^3.1.0",
+    "svg-path-properties": "^2.0.2"
+  },
+  "devDependencies": {
+    "@types/d3-color": "^3.1.3"
   }
 }

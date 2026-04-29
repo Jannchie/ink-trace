@@ -1,3 +1,6 @@
+import { color as parseColor, hsl as parseHsl } from 'd3-color';
+import { svgPathProperties } from 'svg-path-properties';
+
 export type InkTracePresetName =
   | 'fountainPen'
   | 'fineliner'
@@ -179,7 +182,6 @@ interface PathGeometry {
 export const INK_TRACE_WIDTH = 1360;
 export const INK_TRACE_HEIGHT = 700;
 
-const SVG_NS = 'http://www.w3.org/2000/svg';
 const PATH_GEOMETRY_CACHE = new Map<string, PathGeometry>();
 
 export const INK_TRACE_PRESETS: Record<InkTracePresetName, InkTracePreset> = {
@@ -309,8 +311,8 @@ export function drawInkPath(
   seed = 1,
   progress = 1
 ): void {
-  const resolved = resolvePresetInkColor(ctx, cloneInkTracePreset(preset));
-  const prepared = preparePath(ctx, path, seed, 0);
+  const resolved = resolvePresetInkColor(cloneInkTracePreset(preset));
+  const prepared = preparePath(path, seed, 0);
   if (!prepared) return;
 
   const localLength = prepared.length * clamp(progress, 0, 1);
@@ -324,8 +326,8 @@ export function drawInkPath(
   renderPreparedPath(ctx, prepared, resolved, localLength);
 }
 
-function preparePath(ctx: CanvasRenderingContext2D, path: InkTracePathItem, seed: number, index: number): PreparedPath | null {
-  const geometry = readPathGeometry(ctx, path);
+function preparePath(path: InkTracePathItem, seed: number, index: number): PreparedPath | null {
+  const geometry = readPathGeometry(path);
   if (!geometry) return null;
 
   if (path.fill) {
@@ -351,12 +353,12 @@ function preparePath(ctx: CanvasRenderingContext2D, path: InkTracePathItem, seed
   };
 }
 
-function readPathGeometry(ctx: CanvasRenderingContext2D, path: InkTracePathItem): PathGeometry | null {
+function readPathGeometry(path: InkTracePathItem): PathGeometry | null {
   const key = createPathGeometryCacheKey(path);
   const cached = PATH_GEOMETRY_CACHE.get(key);
   if (cached) return cached;
 
-  const sample = samplePath(path.d, 1, ctx.canvas.ownerDocument);
+  const sample = samplePath(path.d, 1);
   if (!sample || sample.points.length < 2) return null;
 
   const segments = splitDashedSegments(sample.points, sample.length, path);
@@ -545,9 +547,9 @@ function renderCanvas(canvas: HTMLCanvasElement, options: ResolvedInkTraceOption
   ctx.scale(options.width / viewBox.width, options.height / viewBox.height);
   ctx.translate(-viewBox.x, -viewBox.y);
 
-  const preset = resolvePresetInkColor(ctx, mergeInkTracePreset(options.preset, options.settings));
+  const preset = resolvePresetInkColor(mergeInkTracePreset(options.preset, options.settings));
   const preparedPaths = options.paths
-    .map((path, index) => preparePath(ctx, path, options.seed + index * 7, index))
+    .map((path, index) => preparePath(path, options.seed + index * 7, index))
     .filter((path): path is PreparedPath => Boolean(path));
   const totalLength = preparedPaths.reduce((sum, path) => sum + path.length, 0);
   const visibleLength = totalLength * options.progress;
@@ -1107,24 +1109,9 @@ function drawSplatter(
   });
 }
 
-function samplePath(d: string, step: number, document: Document): { points: SampledPoint[]; length: number } | null {
-  const svg = document.createElementNS(SVG_NS, 'svg');
-  const path = document.createElementNS(SVG_NS, 'path');
-  path.setAttribute('d', d);
-  svg.appendChild(path);
-  Object.assign(svg.style, {
-    position: 'absolute',
-    width: '0',
-    height: '0',
-    overflow: 'hidden',
-    opacity: '0',
-    pointerEvents: 'none'
-  });
-
-  const host = document.body ?? document.documentElement;
-  host.appendChild(svg);
-
+function samplePath(d: string, step: number): { points: SampledPoint[]; length: number } | null {
   try {
+    const path = new svgPathProperties(d);
     const length = path.getTotalLength();
     if (!Number.isFinite(length) || length <= 0) return null;
 
@@ -1136,8 +1123,8 @@ function samplePath(d: string, step: number, document: Document): { points: Samp
       points.push({ x: point.x, y: point.y, s, tx: 0, ty: 0, nx: 0, ny: 0, w: 1 });
     }
     return { points, length };
-  } finally {
-    svg.remove();
+  } catch {
+    return null;
   }
 }
 
@@ -1264,100 +1251,26 @@ function fbm(x: number, seed: number): number {
   return noise1(x, seed) * 0.6 + noise1(x * 2.3, seed + 1) * 0.25 + noise1(x * 5.1, seed + 2) * 0.15;
 }
 
-function resolvePresetInkColor(ctx: CanvasRenderingContext2D, preset: InkTracePreset): InkTracePreset {
+function resolvePresetInkColor(preset: InkTracePreset): InkTracePreset {
   return {
     ...preset,
     ink: {
       ...preset.ink,
-      color: resolveCanvasColor(ctx, preset.ink.color)
+      color: resolveInkColor(preset.ink.color)
     }
   };
 }
 
-function resolveCanvasColor(ctx: CanvasRenderingContext2D, color: string): string {
-  const parsed = parseCanvasColor(color);
-  if (parsed) return parsed;
-
-  const previous = ctx.fillStyle;
-  ctx.fillStyle = '#000000';
-  ctx.fillStyle = color;
-  const resolved = typeof ctx.fillStyle === 'string' ? parseCanvasColor(ctx.fillStyle) : null;
-  ctx.fillStyle = previous;
-
-  return resolved ?? '#000000';
+function resolveInkColor(color: string): string {
+  return parseColor(color)?.formatHex() ?? '#000000';
 }
 
 function shiftHue(hex: string, degrees: number, saturationMultiplier: number, lightnessMultiplier: number): string {
-  const [r, g, b] = hexToRgb(hex);
-  const rN = r / 255;
-  const gN = g / 255;
-  const bN = b / 255;
-  const max = Math.max(rN, gN, bN);
-  const min = Math.min(rN, gN, bN);
-  let h = 0;
-  let s = 0;
-  let l = (max + min) / 2;
-
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    if (max === rN) h = (gN - bN) / d + (gN < bN ? 6 : 0);
-    else if (max === gN) h = (bN - rN) / d + 2;
-    else h = (rN - gN) / d + 4;
-    h /= 6;
-  }
-
-  h = (h + degrees / 360) % 1;
-  if (h < 0) h += 1;
-  s = clamp(s * saturationMultiplier, 0, 1);
-  l = clamp(l * lightnessMultiplier, 0, 1);
-
-  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-  const p = 2 * l - q;
-  return rgbToHex(
-    hueToRgb(p, q, h + 1 / 3) * 255,
-    hueToRgb(p, q, h) * 255,
-    hueToRgb(p, q, h - 1 / 3) * 255
-  );
-}
-
-function hueToRgb(p: number, q: number, t: number): number {
-  let nextT = t;
-  if (nextT < 0) nextT += 1;
-  if (nextT > 1) nextT -= 1;
-  if (nextT < 1 / 6) return p + (q - p) * 6 * nextT;
-  if (nextT < 1 / 2) return q;
-  if (nextT < 2 / 3) return p + (q - p) * (2 / 3 - nextT) * 6;
-  return p;
-}
-
-function hexToRgb(hex: string): [number, number, number] {
-  const normalized = parseCanvasColor(hex) ?? '#000000';
-  return [
-    parseInt(normalized.slice(1, 3), 16),
-    parseInt(normalized.slice(3, 5), 16),
-    parseInt(normalized.slice(5, 7), 16)
-  ];
-}
-
-function parseCanvasColor(color: string): string | null {
-  const value = color.trim();
-  const shortHex = /^#([0-9a-f]{3})$/i.exec(value);
-  if (shortHex) {
-    return `#${shortHex[1].split('').map((char) => char + char).join('').toLowerCase()}`;
-  }
-
-  const longHex = /^#([0-9a-f]{6})$/i.exec(value);
-  if (longHex) return `#${longHex[1].toLowerCase()}`;
-
-  const rgb = /^rgba?\(\s*([+-]?\d*\.?\d+)(?:\s*,\s*|\s+)([+-]?\d*\.?\d+)(?:\s*,\s*|\s+)([+-]?\d*\.?\d+)/i.exec(value);
-  if (!rgb) return null;
-
-  return rgbToHex(Number(rgb[1]), Number(rgb[2]), Number(rgb[3]));
-}
-
-function rgbToHex(r: number, g: number, b: number): string {
-  return `#${[r, g, b].map((value) => clamp(Math.round(value), 0, 255).toString(16).padStart(2, '0')).join('')}`;
+  const nextColor = parseHsl(hex);
+  nextColor.h = (Number.isFinite(nextColor.h) ? nextColor.h : 0) + degrees;
+  nextColor.s = clamp(Number.isFinite(nextColor.s) ? nextColor.s * saturationMultiplier : 0, 0, 1);
+  nextColor.l = clamp(Number.isFinite(nextColor.l) ? nextColor.l * lightnessMultiplier : 0, 0, 1);
+  return nextColor.formatHex();
 }
 
 function resolveViewBox(input: string | InkTraceViewBox | null): Required<InkTraceViewBox> {
